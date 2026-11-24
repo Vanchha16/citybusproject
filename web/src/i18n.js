@@ -102,6 +102,15 @@ const strings = {
     about: 'About this prototype',
     nearbyTitle: 'Bus stops near you',
     refreshLocation: 'Update my location',
+    loc: {
+      denied: 'Location is blocked',
+      unavailable: 'Location not found',
+      timeout: 'Location not found',
+      unsupported: 'No location in this browser',
+      far: (km) => `You're ${km} km from Phnom Penh`,
+    },
+    locDeniedHelp: 'Allow location for this site in your browser settings.',
+    tryAgain: 'Try again',
   },
   km: {
     appName: 'ឡានក្រុង',
@@ -203,6 +212,15 @@ const strings = {
     about: 'អំពីគំរូនេះ',
     nearbyTitle: 'ចំណតឡានក្រុងនៅជិតអ្នក',
     refreshLocation: 'ធ្វើបច្ចុប្បន្នភាពទីតាំង',
+    loc: {
+      denied: 'ទីតាំងត្រូវបានបិទ',
+      unavailable: 'រកមិនឃើញទីតាំង',
+      timeout: 'រកមិនឃើញទីតាំង',
+      unsupported: 'កម្មវិធីរុករកនេះគ្មានទីតាំង',
+      far: (km) => `អ្នកនៅឆ្ងាយពីភ្នំពេញ ${kmNum(km)} គ.ម`,
+    },
+    locDeniedHelp: 'សូមអនុញ្ញាតទីតាំងសម្រាប់គេហទំព័រនេះ ក្នុងការកំណត់កម្មវិធីរុករក។',
+    tryAgain: 'ព្យាយាមម្តងទៀត',
   },
 };
 

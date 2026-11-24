@@ -12,6 +12,7 @@ import HomeView from './components/HomeView.jsx';
 import LinesView, { LineDetail } from './components/LinesView.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import BottomNav from './components/BottomNav.jsx';
+import LocationNotice from './components/LocationNotice.jsx';
 import { AlertBanner, BusLegend } from './components/Realtime.jsx';
 import { ChevronIcon, LocateIcon, PinIcon, PlaneIcon, SwapIcon } from './components/icons.jsx';
 
@@ -172,18 +173,29 @@ export default function App() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
+  // Why we are (not) using the real position, so the app can say so instead of silently
+  // showing the demo spot: { kind: 'ok' | 'denied' | 'unavailable' | 'timeout' | 'far' | 'unsupported', km? }
+  const [locStatus, setLocStatus] = useState(null);
   const locate = useCallback(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) { setLocStatus({ kind: 'unsupported' }); return; }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const km = kmBetween(p, PP_CENTER);
         setLocating(false);
-        setHere(kmBetween(p, PP_CENTER) < 40 ? p : DEMO_LOCATION);
+        setHere(km < 40 ? p : DEMO_LOCATION);
+        setLocStatus(km < 40 ? { kind: 'ok' } : { kind: 'far', km: Math.round(km) });
         setOriginPlace(null);
       },
-      () => { setLocating(false); setHere(DEMO_LOCATION); setOriginPlace(null); },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      (err) => {
+        setLocating(false);
+        setHere(DEMO_LOCATION);
+        setOriginPlace(null);
+        setLocStatus({ kind: err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable' });
+      },
+      // A quick Wi-Fi/cell fix is plenty for finding nearby stops, and works indoors where GPS often doesn't.
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 },
     );
   }, []);
   useEffect(() => { locate(); }, [locate]);
@@ -381,6 +393,8 @@ export default function App() {
           )}
         </div>
 
+        {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} />}
+
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p>}
 
         {network && !destination && lineFocusId && lineById.get(lineFocusId) && (
@@ -472,6 +486,7 @@ export default function App() {
           {locating ? s.locating : s.refreshLocation}
         </button>
       </div>
+      {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} />}
       <div className="rounded-2xl bg-white p-3.5 ring-1 ring-line">
         {nearby && (
           <NearbyStops nearby={nearby} now={now} lineById={lineById} lang={lang} watch={alert.watch} onWatch={alert.toggle} limit={5} showHeading={false} />
@@ -507,6 +522,7 @@ export default function App() {
               onAirport={() => placeById.get('kti') && chooseDestination(placeById.get('kti'))}
               onNearby={() => navigate('nearby')}
               onBell={() => (alert.watch ? openPlanner(null) : navigate('settings'))}
+              locationNotice={!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} />}
               isDesktop={isDesktop}
             />
           )}

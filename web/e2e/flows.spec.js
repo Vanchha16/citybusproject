@@ -167,18 +167,31 @@ test.describe('your location: allowed, in Phnom Penh', () => {
   test('uses the real position and finds the stops next to you', async ({ page }) => {
     const s = await openHome(page);
     await expect(page.getByText(s.fromHere(s.myLocation))).toBeVisible();
+    await expect(page.getByRole('button', { name: s.tryAgain })).toHaveCount(0); // no warning when it works
     await nav(page, s, 'nearby').click();
     const firstStop = page.locator('section[aria-labelledby="nearby-page-h"] > ul > li').first();
     await expect(firstStop).toContainText('Royal Palace');
   });
 });
 
+test.describe('your location: blocked', () => {
+  test.use({ permissions: [] });
+
+  test('says location is blocked and offers to try again', async ({ page }) => {
+    const s = await openHome(page);
+    await expect(page.getByText(s.fromHere(s.demoLocation))).toBeVisible();
+    await expect(page.getByText(s.loc.denied).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: s.tryAgain }).first()).toBeVisible();
+  });
+});
+
 test.describe('your location: far from Phnom Penh', () => {
   test.use({ permissions: ['geolocation'], geolocation: { latitude: 13.3633, longitude: 103.8564 } }); // Siem Reap
 
-  test('falls back to the demo location', async ({ page }) => {
+  test('falls back to the demo location and says why', async ({ page }) => {
     const s = await openHome(page);
     await expect(page.getByText(s.fromHere(s.demoLocation))).toBeVisible();
+    await expect(page.getByText(/km from Phnom Penh/).first()).toContainText(/2\d\d km/); // Siem Reap ≈ 230 km
   });
 });
 
