@@ -88,6 +88,7 @@ function useBusAlert(lineById, lang) {
 // Used when GPS is unavailable or the device is outside Phnom Penh (e.g. a judge's laptop).
 const DEMO_LOCATION = { lat: 11.5697, lng: 104.9211, demo: true };
 const PP_CENTER = { lat: 11.556, lng: 104.92 };
+const ROUGH_M = 3000; // worse than ±3 km = a guess from the internet connection, not GPS/Wi-Fi
 const POPULAR = ['kti', 'central-market', 'royal-palace', 'aeon2', 'russian-market', 'rupp'];
 
 const kmBetween = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 109);
@@ -173,30 +174,42 @@ export default function App() {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  // Why we are (not) using the real position, so the app can say so instead of silently
-  // showing the demo spot: { kind: 'ok' | 'denied' | 'unavailable' | 'timeout' | 'far' | 'unsupported', km? }
+  // Why we are (not) using the real position, so the app can say so instead of silently showing
+  // the demo spot: { kind: 'ok' | 'rough' | 'far' | 'denied' | 'unavailable' | 'timeout' | 'unsupported', km? }
   const [locStatus, setLocStatus] = useState(null);
-  const locate = useCallback(() => {
+  const locate = useCallback(async () => {
     if (!navigator.geolocation) { setLocStatus({ kind: 'unsupported' }); return; }
     setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const km = kmBetween(p, PP_CENTER);
-        setLocating(false);
-        setHere(km < 40 ? p : DEMO_LOCATION);
-        setLocStatus(km < 40 ? { kind: 'ok' } : { kind: 'far', km: Math.round(km) });
-        setOriginPlace(null);
-      },
-      (err) => {
-        setLocating(false);
-        setHere(DEMO_LOCATION);
-        setOriginPlace(null);
-        setLocStatus({ kind: err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable' });
-      },
-      // A quick Wi-Fi/cell fix is plenty for finding nearby stops, and works indoors where GPS often doesn't.
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 },
-    );
+    const fix = (opts) => new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, opts));
+    const apply = (pos) => {
+      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const km = kmBetween(p, PP_CENTER);
+      // Use it if it's in Phnom Penh, even when rough (better than nothing) — but say it's a guess.
+      setHere(km < 40 ? p : DEMO_LOCATION);
+      if (pos.coords.accuracy > ROUGH_M) setLocStatus({ kind: 'rough', km: Math.max(1, Math.round(pos.coords.accuracy / 1000)) });
+      else setLocStatus(km < 40 ? { kind: 'ok' } : { kind: 'far', km: Math.round(km) });
+    };
+    let first;
+    try {
+      // 1) Quick Wi-Fi/cell fix: fast, works indoors. Shown straight away — no waiting for GPS.
+      first = await fix({ enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 });
+    } catch (err) {
+      setLocating(false);
+      setHere(DEMO_LOCATION);
+      setOriginPlace(null);
+      setLocStatus({ kind: err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable' });
+      return;
+    }
+    setLocating(false);
+    setOriginPlace(null);
+    apply(first);
+    // 2) Only a rough guess (e.g. from the internet connection on a computer)? Ask for real GPS
+    //    in the background, and switch to it if it's better.
+    if (first.coords.accuracy > ROUGH_M) {
+      fix({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 })
+        .then((better) => { if (better.coords.accuracy < first.coords.accuracy) apply(better); })
+        .catch(() => { /* keep the rough fix and its message */ });
+    }
   }, []);
   useEffect(() => { locate(); }, [locate]);
 
@@ -356,6 +369,8 @@ export default function App() {
         {/* From / To */}
         <div className="relative space-y-2">
           <PlaceSearch
+            key={focusTarget === 'from' ? 'from-focus' : 'from'}
+            autoFocus={focusTarget === 'from'}
             fieldLabel={s.from}
             value={originPlace}
             valueText={originText}
@@ -393,7 +408,7 @@ export default function App() {
           )}
         </div>
 
-        {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} />}
+        {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} onChooseStart={() => openPlanner('from')} />}
 
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p>}
 
@@ -486,7 +501,7 @@ export default function App() {
           {locating ? s.locating : s.refreshLocation}
         </button>
       </div>
-      {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} />}
+      {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} onChooseStart={() => openPlanner('from')} />}
       <div className="rounded-2xl bg-white p-3.5 ring-1 ring-line">
         {nearby && (
           <NearbyStops nearby={nearby} now={now} lineById={lineById} lang={lang} watch={alert.watch} onWatch={alert.toggle} limit={5} showHeading={false} />
@@ -522,7 +537,7 @@ export default function App() {
               onAirport={() => placeById.get('kti') && chooseDestination(placeById.get('kti'))}
               onNearby={() => navigate('nearby')}
               onBell={() => (alert.watch ? openPlanner(null) : navigate('settings'))}
-              locationNotice={!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} />}
+              locationNotice={!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} onChooseStart={() => openPlanner('from')} />}
               isDesktop={isDesktop}
             />
           )}

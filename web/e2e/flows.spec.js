@@ -174,6 +174,23 @@ test.describe('your location: allowed, in Phnom Penh', () => {
   });
 });
 
+test.describe('your location: only a rough guess (e.g. from the internet connection)', () => {
+  // About 300 km away (Battambang) with ±50 km accuracy, like a computer's IP-based location.
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: 13.0957, longitude: 103.2022, accuracy: 50000 } });
+
+  test('says it is a rough guess (not "302 km away") and lets you choose the start', async ({ page }) => {
+    const s = await openHome(page);
+    await expect(page.getByText(s.loc.rough(50)).first()).toBeVisible();
+    await expect(page.getByText(/km from Phnom Penh/)).toHaveCount(0);
+    await page.getByRole('button', { name: s.chooseStart }).first().click();
+    await expect(page.getByPlaceholder(s.from)).toBeFocused();
+    await page.getByPlaceholder(s.from).fill('royal palace');
+    await page.getByRole('option', { name: /Royal Palace/ }).first().click();
+    await expect(page.getByPlaceholder(s.from)).toHaveValue('Royal Palace');
+    await expect(page.getByText(s.loc.rough(50))).toHaveCount(0); // a chosen start needs no warning
+  });
+});
+
 test.describe('your location: blocked', () => {
   test.use({ permissions: [] });
 
