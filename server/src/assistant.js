@@ -103,8 +103,9 @@ export function resolvePlace(id) {
   return item ? { id: item.id, type: item.type, name: item.name, lat: item.lat, lng: item.lng, category: item.category } : null;
 }
 
-export async function understand(message) {
-  if (client) {
+/** `allowAI: false` (budget used up) answers with the free keyword engine instead. */
+export async function understand(message, { allowAI = true } = {}) {
+  if (client && allowAI) {
     try {
       return { ...(await understandWithClaude(message)), engine: 'claude' };
     } catch (err) {

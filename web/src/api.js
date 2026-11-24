@@ -1,8 +1,19 @@
-async function request(path, options) {
-  const res = await fetch(path, options);
+// Demo mode pins the server's clock to a time of day (e.g. 09:00) that keeps running
+// from when the demo started, so a rehearsal at night still shows buses.
+let demoClock = null; // { startMinutes, startedAt }
+export function setDemoClock(startMinutes) {
+  demoClock = startMinutes == null ? null : { startMinutes, startedAt: Date.now() };
+}
+const demoHeaders = () =>
+  demoClock ? { 'X-Demo-Clock': String((demoClock.startMinutes + (Date.now() - demoClock.startedAt) / 60000) % 1440) } : {};
+
+async function request(path, options = {}) {
+  const res = await fetch(path, { ...options, headers: { ...(options.headers ?? {}), ...demoHeaders() } });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed (${res.status})`);
+    const err = new Error(body.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }

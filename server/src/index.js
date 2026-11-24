@@ -10,9 +10,20 @@ import { searchPlaces } from './search.js';
 import { understand, resolvePlace, aiEnabled } from './assistant.js';
 import { composeAnswer } from './describe.js';
 import { haversine } from './geo.js';
+import { createLimiter, clientId } from './ratelimit.js';
 
 const app = express();
 app.use(express.json({ limit: '20kb' }));
+const limiter = createLimiter();
+
+// Demo mode: the app can ask for the network "as at" a time of day (X-Demo-Clock header,
+// minutes since midnight), so a demo or rehearsal at night still shows buses running.
+app.use('/api', (req, _res, next) => {
+  const raw = req.get('x-demo-clock');
+  const demo = raw === undefined ? NaN : Number(raw);
+  req.now = Number.isFinite(demo) && demo >= 0 && demo < 1440 ? demo : nowMinutes();
+  next();
+});
 
 const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
 function pointFromQuery(q, prefix) {
@@ -21,9 +32,9 @@ function pointFromQuery(q, prefix) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
   return { lat, lng };
 }
-const startTime = (q) => {
-  const t = num(q.time);
-  return Number.isFinite(t) ? t : nowMinutes();
+const startTime = (req) => {
+  const t = num(req.query.time);
+  return Number.isFinite(t) ? t : req.now;
 };
 
 /** Nearby stops with their next buses, plus nearby places. */
@@ -51,7 +62,7 @@ function nearby(point, t) {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, ai: aiEnabled, roadShapes: hasRoadShapes, now: nowMinutes() }));
 
-app.get('/api/network', (_req, res) => {
+app.get('/api/network', (req, res) => {
   res.json({
     stops,
     places,
@@ -61,7 +72,7 @@ app.get('/api/network', (_req, res) => {
       headsigns: patterns[l.id].map((p) => p.headsign),
     })),
     ai: aiEnabled,
-    now: nowMinutes(),
+    now: req.now,
   });
 });
 
@@ -73,7 +84,7 @@ app.get('/api/search', (req, res) => {
 app.get('/api/nearby', (req, res) => {
   const point = pointFromQuery(req.query, '');
   if (!point) return res.status(400).json({ error: 'lat and lng are required' });
-  res.json(nearby(point, startTime(req.query)));
+  res.json(nearby(point, startTime(req)));
 });
 
 app.get('/api/lines-serving', (req, res) => {
@@ -86,12 +97,12 @@ app.get('/api/plan', (req, res) => {
   const from = pointFromQuery(req.query, 'from');
   const to = pointFromQuery(req.query, 'to');
   if (!from || !to) return res.status(400).json({ error: 'fromLat, fromLng, toLat and toLng are required' });
-  const t = startTime(req.query);
+  const t = startTime(req);
   res.json(annotateWithRealtime(planTrip(from, to, t), t));
 });
 
-app.get('/api/buses', (_req, res) => {
-  const t = nowMinutes();
+app.get('/api/buses', (req, res) => {
+  const t = req.now;
   const vehicles = vehiclesAt(t).map(({ progressMin, scheduledDep, ...v }) => v);
   res.json({ now: t, buses: vehicles, summary: summarize(vehicles) });
 });
@@ -105,7 +116,7 @@ app.get('/api/arrivals', (req, res) => {
   if (idx < 0 || idx === pattern.stopIds.length - 1) {
     return res.status(400).json({ error: 'Unknown stopId/lineId/dir combination' });
   }
-  const t = nowMinutes();
+  const t = req.now;
   res.json({
     now: t,
     stop: stopById.get(stopId),
@@ -122,7 +133,13 @@ app.post('/api/assistant', async (req, res) => {
   const loc = req.body?.location;
   const here = loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng) ? { lat: loc.lat, lng: loc.lng } : null;
 
-  const u = await understand(message);
+  // Flood guard + AI budget (see ratelimit.js). Over the AI budget, the free keyword engine answers.
+  const gate = limiter.check(clientId(req), aiEnabled);
+  if (!gate.allowed) {
+    res.set('Retry-After', String(gate.retryAfterSec));
+    return res.status(429).json({ error: 'Too many questions. Please try again in a minute.', retryAfterSec: gate.retryAfterSec });
+  }
+  const u = await understand(message, { allowAI: gate.useAI });
   const lang = u.language === 'km' ? 'km' : 'en';
   const originPlace = resolvePlace(u.origin_place_id);
   const origin = originPlace
@@ -131,7 +148,7 @@ app.post('/api/assistant', async (req, res) => {
       ? { lat: here.lat, lng: here.lng, label: { en: 'your location', km: 'ទីតាំងរបស់អ្នក' }, isCurrentLocation: true }
       : null;
   const destination = resolvePlace(u.destination_place_id);
-  const t = nowMinutes();
+  const t = req.now;
 
   if (!origin && destination) {
     return res.json({

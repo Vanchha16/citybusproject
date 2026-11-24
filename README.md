@@ -36,6 +36,23 @@ Other commands:
 If GPS is off, or you're outside Phnom Penh, the app starts from **Central Market (demo location)**.
 To demo at night when buses are out of service, set `DEMO_CLOCK=08:30` in `server/.env`.
 
+## Pitch demo
+
+Open the site with **`?demo`** (e.g. `https://citybus-omega.vercel.app/?demo`) or tap
+**Settings → Start demo**. A 9-step guided tour drives the real app: pick the airport, see only
+airport buses, open the best route, set an alert, walk to the stop with the map following,
+switch to Khmer, ask in Khmer. It runs at **09:00 Phnom Penh time** whatever the real time, so
+rehearsals at night work. Controls: → / Page Down / Space (next), ← / Page Up (back),
+Home (first step), Esc (exit). Presentation clickers work too.
+
+## AI answers and cost protection
+
+Add `ANTHROPIC_API_KEY` in Vercel → Project → Settings → Environment Variables, then redeploy.
+The ask endpoint is protected (`server/src/ratelimit.js`): more than `ASK_PER_MINUTE` (10)
+questions a minute from one person gets a 429; each person gets `AI_PER_HOUR` (20) Claude
+answers an hour and then free keyword answers; at most `AI_PER_DAY` (300) Claude answers a
+day per running instance. All three are environment variables.
+
 ## Deploy (Vercel)
 
 `vercel.json` builds the web app to static files (`web/dist`) and runs the API as one serverless

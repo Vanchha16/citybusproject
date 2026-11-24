@@ -13,6 +13,8 @@ import LinesView, { LineDetail } from './components/LinesView.jsx';
 import SettingsView from './components/SettingsView.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import LocationNotice from './components/LocationNotice.jsx';
+import DemoBar from './components/DemoBar.jsx';
+import { useDemo } from './useDemo.js';
 import { AlertBanner, BusLegend } from './components/Realtime.jsx';
 import { ChevronIcon, LocateIcon, PinIcon, PlaneIcon, SwapIcon } from './components/icons.jsx';
 
@@ -82,13 +84,26 @@ function useBusAlert(lineById, lang) {
     });
   }, []);
 
-  return { watch, info, alerting, toggle, stop: () => setWatch(null) };
+  /** Turn the alert on for `target` (no-op if it already is). */
+  const set = useCallback((target) => {
+    setWatch((cur) => (cur && cur.stopId === target.stopId && cur.lineId === target.lineId && cur.dir === target.dir ? cur : target));
+  }, []);
+
+  return { watch, info, alerting, toggle, set, stop: () => setWatch(null) };
 }
 
 // Used when GPS is unavailable or the device is outside Phnom Penh (e.g. a judge's laptop).
 const DEMO_LOCATION = { lat: 11.5697, lng: 104.9211, demo: true };
 const PP_CENTER = { lat: 11.556, lng: 104.92 };
 const ROUGH_M = 3000; // worse than ±3 km = a guess from the internet connection, not GPS/Wi-Fi
+// Demo passenger: a few hundred metres west of Central Market, heading to the airport.
+const DEMO_START = { lat: 11.5712, lng: 104.9178 };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Resolve when `check()` is true (or after `timeoutMs`), polling every 150 ms. */
+const waitFor = async (check, timeoutMs = 6000) => {
+  const until = Date.now() + timeoutMs;
+  while (!check() && Date.now() < until) await sleep(150);
+};
 const POPULAR = ['kti', 'central-market', 'royal-palace', 'aeon2', 'russian-market', 'rupp'];
 
 const kmBetween = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 109);
@@ -180,6 +195,7 @@ export default function App() {
   const [accuracyM, setAccuracyM] = useState(null);
   const hereRef = useRef(here);
   useEffect(() => { hereRef.current = here; }, [here]);
+  const demoActive = useRef(false); // guided demo running: it moves the dot itself
 
   /** Turn a browser position into `here` + a status. `minMoveM` ignores GPS jitter while walking. */
   const applyFix = useCallback((pos, minMoveM = 0) => {
@@ -228,7 +244,7 @@ export default function App() {
   // Follow me: keep tracking the position while walking. Off by default (battery).
   const [following, setFollowing] = useState(false);
   useEffect(() => {
-    if (!following) return undefined;
+    if (!following || demoActive.current) return undefined; // the demo moves the dot itself
     if (!navigator.geolocation) {
       setLocStatus({ kind: 'unsupported' });
       setFollowing(false);
@@ -264,6 +280,9 @@ export default function App() {
   useEffect(() => {
     if (!planKey) { setPlan(null); return; }
     if (plan?.key === planKey) return;
+    // Walking (Follow me) while a route is open must not wipe it: re-plan for the new
+    // position only once the passenger goes back to the list of options.
+    if (selected && plan?.key?.split('>')[1] === pointKey(destination)) return;
     let cancelled = false;
     setPlanning(true);
     setSelected(null);
@@ -273,7 +292,7 @@ export default function App() {
       .finally(() => { if (!cancelled) setPlanning(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planKey]);
+  }, [planKey, Boolean(selected)]);
 
   // Nearby stops for the starting point.
   const originKey = pointKey(origin);
@@ -355,12 +374,71 @@ export default function App() {
         if (res.plan) setPlan({ ...res.plan, key: `${pointKey(res.origin)}>${pointKey(res.destination)}` });
       }
       setSheetOpen(true);
-    } catch {
-      setAnswer({ answer: s.error, engine: 'keywords', language: lang });
+    } catch (err) {
+      setAnswer({ answer: err.status === 429 ? s.tooManyQuestions : s.error, engine: 'keywords', language: lang });
     } finally {
       setAsking(false);
     }
   };
+
+  // ---- Guided demo (Settings → Start demo, or open the site with ?demo) ----
+  const latest = useRef({});
+  latest.current = { plan, planKey, selected, placeById, watch: alert.watch };
+  const demoActions = useRef({});
+  demoActions.current = {
+    enter: () => { demoActive.current = true; },
+    exit: () => { demoActive.current = false; setFollowing(false); locate(); },
+    reset: () => {
+      reset();
+      setLineFocusId(null);
+      setOriginPlace(null);
+      setFollowing(false);
+      setHere(DEMO_START);
+      setLocStatus({ kind: 'ok' });
+      setAccuracyM(12);
+      setLang('en');
+      setView('home');
+      setSheetOpen(false);
+      if (latest.current.watch) alert.stop();
+    },
+    pickAirport: () => chooseDestination(latest.current.placeById.get('kti')),
+    waitForPlan: () => waitFor(() => latest.current.plan?.key === latest.current.planKey && latest.current.plan.options.length > 0),
+    selectBestRoute: () => {
+      const best = latest.current.plan?.options[0];
+      if (best) { setSelected(best); setSheetOpen(false); }
+    },
+    alertFirstBus: () => {
+      const leg = latest.current.selected?.legs.find((l) => l.type === 'bus');
+      if (leg) alert.set({ stopId: leg.from.stopId, stopName: leg.from.name, lineId: leg.lineId, dir: leg.dir });
+    },
+    walkToStop: async (fast) => {
+      setFollowing(true);
+      setFollowPaused(false);
+      const leg = latest.current.selected?.legs[0];
+      if (!leg || leg.type !== 'walk') return;
+      const [[aLat, aLng], [bLat, bLng]] = [leg.geometry[0], leg.geometry.at(-1)];
+      const steps = fast ? [1] : Array.from({ length: 16 }, (_, i) => (i + 1) / 16);
+      for (const f of steps) {
+        if (!demoActive.current) return;
+        setHere({ lat: aLat + (bLat - aLat) * f, lng: aLng + (bLng - aLng) * f });
+        if (!fast) await sleep(500);
+      }
+    },
+    setLang,
+    askKhmer: () => {
+      setFollowing(false);
+      setSelected(null);
+      setView('trip');
+      setSheetOpen(true);
+      ask('ពីផ្សារធំថ្មី ទៅព្រលានយន្តហោះ');
+    },
+  };
+  const demo = useDemo(demoActions);
+  // Open the site with ?demo to start the tour straight away (handy on the pitch laptop).
+  useEffect(() => {
+    if (network && new URLSearchParams(window.location.search).has('demo') && demo.step === null) demo.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [network]);
 
   // Keep the route clear of the panel: left panel on desktop, bottom sheet on phones.
   const sheetHeight = sheetOpen ? 0.82 : 0.48;
@@ -596,7 +674,15 @@ export default function App() {
           {view === 'lines' && network && <LinesView network={network} lang={lang} onShowLine={showLine} />}
           {view === 'nearby' && nearbyPage}
           {view === 'settings' && (
-            <SettingsView lang={lang} setLang={setLang} aiEnabled={network?.ai} watch={alert.watch} lineById={lineById} onStopWatch={alert.stop} />
+            <SettingsView
+              lang={lang}
+              setLang={setLang}
+              aiEnabled={network?.ai}
+              watch={alert.watch}
+              lineById={lineById}
+              onStopWatch={alert.stop}
+              onStartDemo={demo.start}
+            />
           )}
           {error && !isTrip && <p className="mx-4 mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p>}
         </div>
@@ -662,6 +748,7 @@ export default function App() {
           />
         )}
       </main>
+      <DemoBar demo={demo} lang={lang} />
     </div>
   );
 }

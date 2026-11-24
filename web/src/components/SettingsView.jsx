@@ -2,12 +2,24 @@ import LineBadge from './LineBadge.jsx';
 import Flag from './Flag.jsx';
 import { label, t } from '../i18n.js';
 
-export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById, onStopWatch }) {
+export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById, onStopWatch, onStartDemo }) {
   const s = t(lang);
   const line = watch ? lineById.get(watch.lineId) : null;
   return (
     <div className="space-y-6 px-4 pb-6 pt-5">
       <h1 className="text-xl font-bold">{s.settingsTitle}</h1>
+
+      <button
+        type="button"
+        onClick={onStartDemo}
+        className="flex w-full items-center gap-3 rounded-2xl bg-ink px-4 py-3.5 text-left text-white shadow-sm hover:bg-ink/90"
+      >
+        <span className="flex size-9 items-center justify-center rounded-full bg-signal text-ink" aria-hidden>▶</span>
+        <span>
+          <span className="block font-semibold">{s.demo.start}</span>
+          <span className="block text-sm text-white/75">{s.demo.hint}</span>
+        </span>
+      </button>
 
       <section aria-labelledby="lang-h">
         <h2 id="lang-h" className="mb-2 text-sm font-semibold text-ink-soft">{s.language}</h2>

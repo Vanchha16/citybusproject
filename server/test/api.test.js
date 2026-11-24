@@ -131,6 +131,33 @@ test('assistant: English trip, Khmer trip, nearby, needs location, bad input', a
   assert.equal(broken.body.error, 'Invalid JSON body');
 });
 
+test('ask: flooding from one person gets a 429 with Retry-After; others still get answers', async () => {
+  const ask = (ip) => fetch(`${base}/api/assistant`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+    body: JSON.stringify({ message: 'to the airport', location: CENTRAL }),
+  });
+  const statuses = [];
+  for (let i = 0; i < 12; i++) statuses.push((await ask('203.0.113.7')).status);
+  assert.deepEqual(statuses.slice(0, 10), Array(10).fill(200));
+  const blocked = await ask('203.0.113.7');
+  assert.equal(blocked.status, 429);
+  assert.ok(Number(blocked.headers.get('retry-after')) > 0);
+  assert.match((await blocked.json()).error, /Too many questions/);
+  assert.equal((await ask('198.51.100.4')).status, 200);
+});
+
+test('demo clock: the network "as at" a time of day', async () => {
+  const at = async (minutes) => (await fetch(`${base}/api/buses`, { headers: { 'X-Demo-Clock': String(minutes) } })).json();
+  const night = await at(3 * 60);
+  const morning = await at(9 * 60);
+  assert.equal(night.now, 180);
+  assert.equal(night.buses.length, 0, 'no buses at 3 am');
+  assert.ok(morning.buses.length > 10, 'buses at 9 am');
+  const bad = await (await fetch(`${base}/api/buses`, { headers: { 'X-Demo-Clock': 'nonsense' } })).json();
+  assert.ok(Math.abs(bad.now - 540) < 5, 'invalid header falls back to the server clock (DEMO_CLOCK=09:00 in tests)');
+});
+
 test('unknown API path is a JSON 404', async () => {
   const { status, body } = await get('/api/nope');
   assert.equal(status, 404);
