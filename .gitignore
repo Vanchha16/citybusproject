@@ -4,3 +4,5 @@ dist/
 *.log
 web/test-results/
 web/playwright-report/
+
+.vercel
