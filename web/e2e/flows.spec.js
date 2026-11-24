@@ -236,6 +236,46 @@ test.describe('follow me while walking', () => {
   });
 });
 
+test.describe('arriving at a bus stop', () => {
+  // ~150 m from the Central Market stop.
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: 11.5708, longitude: 104.9200 } });
+
+  test('shows the next buses when you reach the stop, your bus first, and hides when you walk on', async ({ page, context }) => {
+    const s = await openHome(page);
+    await searchDestination(page, s, 'airport', 'Techo International Airport');
+    await routeOptions(page).first().click();
+    await expect(page.getByText(s.nextBus)).toBeVisible();
+    const card = page.locator('section[aria-labelledby="atstop-h"]');
+    await expect(card).toHaveCount(0); // not at a stop yet
+
+    await page.locator('main').getByRole('button', { name: s.followMe }).click();
+    await context.setGeolocation({ latitude: 11.5697, longitude: 104.9211 }); // at the Central Market stop
+    await expect(card).toContainText(s.atStop('Central Market'), { timeout: 15_000 });
+    const mine = card.locator('[data-your-bus]');
+    await expect(mine).toContainText(s.yourBus);
+    await expect(mine.locator('[data-line]')).toHaveAttribute('data-line', 'AEB');
+    await expect(mine).toContainText(/\d+ min|now/);
+
+    await context.setGeolocation({ latitude: 11.5730, longitude: 104.9250 }); // walk on, away from any stop
+    await expect(card).toHaveCount(0, { timeout: 15_000 });
+
+    await context.setGeolocation({ latitude: 11.5745, longitude: 104.9290 }); // the Night Market stop
+    await expect(card).toContainText(s.atStop('Night Market (Riverside)'), { timeout: 15_000 });
+    await expect(card.locator('[data-your-bus]')).toHaveCount(0); // you don't board there
+  });
+
+  test('can be closed', async ({ page, context }) => {
+    const s = await openHome(page);
+    await page.getByRole('button', { name: s.openMap }).or(nav(page, s, 'directions')).first().click();
+    await page.locator('main').getByRole('button', { name: s.followMe }).click();
+    await context.setGeolocation({ latitude: 11.5697, longitude: 104.9211 });
+    const card = page.locator('section[aria-labelledby="atstop-h"]');
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await card.getByRole('button', { name: s.close }).click();
+    await expect(card).toHaveCount(0);
+  });
+});
+
 test.describe('your location: blocked', () => {
   test.use({ permissions: [] });
 
@@ -244,6 +284,8 @@ test.describe('your location: blocked', () => {
     await expect(page.getByText(s.fromHere(s.demoLocation))).toBeVisible();
     await expect(page.getByText(s.loc.denied).first()).toBeVisible();
     await expect(page.getByRole('button', { name: s.tryAgain }).first()).toBeVisible();
+    // The demo spot is a bus stop, but you are not really there: no "You're at" card.
+    await expect(page.locator('section[aria-labelledby="atstop-h"]')).toHaveCount(0);
   });
 });
 

@@ -11,7 +11,7 @@ const POPULAR = ['kti', 'central-market', 'royal-palace', 'aeon2', 'russian-mark
 export default function HomeView({
   lang, onToggleLang, network, buses, summary, origin, originText, placeById, lineById, now,
   watch, watchInfo, onSearch, onAsk, onPick, onOpenMap, onCityLines, onAirport, onNearby, onBell, isDesktop,
-  locationNotice,
+  locationNotice, stopCard,
 }) {
   const s = t(lang);
   const running = summary ? summary.live + summary.estimated + summary.lost : 0;
@@ -66,6 +66,7 @@ export default function HomeView({
         </div>
       </div>
 
+      {stopCard && <div className="mx-4 mt-3">{stopCard}</div>}
       {locationNotice && <div className="mx-4 mt-2">{locationNotice}</div>}
 
       {/* Quick destinations */}

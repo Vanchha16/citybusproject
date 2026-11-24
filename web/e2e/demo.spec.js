@@ -47,6 +47,9 @@ test('guided demo runs start to finish with the keyboard, and Back replays corre
   await caption(5);
   await expect(page.locator('main').getByText(en.following)).toBeVisible();
   await expect(page.getByText(en.nextBus)).toBeVisible({ timeout: 12_000 }); // route stays open while walking
+  // Reaching the stop shows the next buses there, with the passenger's bus first.
+  const atStop = page.locator('section[aria-labelledby="atstop-h"]');
+  await expect(atStop.locator('[data-your-bus]')).toBeVisible({ timeout: 12_000 });
 
   await next(); // 7: Khmer
   await caption(6, km);

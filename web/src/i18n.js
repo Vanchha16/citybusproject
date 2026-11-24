@@ -114,6 +114,8 @@ const strings = {
     followMe: 'Follow me',
     following: 'Following you',
     tooManyQuestions: 'Too many questions. Try again in a minute.',
+    atStop: (name) => `You're at ${name}`,
+    yourBus: 'Your bus',
     demo: {
       start: 'Start demo',
       hint: 'Guided tour, about 1 minute',
@@ -249,6 +251,8 @@ const strings = {
     followMe: 'តាមដានខ្ញុំ',
     following: 'កំពុងតាមដានអ្នក',
     tooManyQuestions: 'សំណួរច្រើនពេក។ សូមព្យាយាមម្តងទៀតក្នុងមួយនាទី។',
+    atStop: (name) => `អ្នកនៅចំណត ${name}`,
+    yourBus: 'ឡានរបស់អ្នក',
     demo: {
       start: 'ចាប់ផ្តើមបង្ហាញ',
       hint: 'ការណែនាំប្រហែល ១ នាទី',

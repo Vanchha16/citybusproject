@@ -14,6 +14,7 @@ import SettingsView from './components/SettingsView.jsx';
 import BottomNav from './components/BottomNav.jsx';
 import LocationNotice from './components/LocationNotice.jsx';
 import DemoBar from './components/DemoBar.jsx';
+import AtStopCard from './components/AtStopCard.jsx';
 import { useDemo } from './useDemo.js';
 import { AlertBanner, BusLegend } from './components/Realtime.jsx';
 import { ChevronIcon, LocateIcon, PinIcon, PlaneIcon, SwapIcon } from './components/icons.jsx';
@@ -156,6 +157,8 @@ export default function App() {
   const [originPlace, setOriginPlace] = useState(null); // null = use `here`
   const [destination, setDestination] = useState(null);
   const [lineFocusId, setLineFocusId] = useState(null); // a line opened from the Lines tab
+  const [atStopId, setAtStopId] = useState(null); // the stop you've walked up to (real position only)
+  const [dismissedStopId, setDismissedStopId] = useState(null);
 
   const [plan, setPlan] = useState(null);
   const [planning, setPlanning] = useState(false);
@@ -302,15 +305,52 @@ export default function App() {
     let current = true;
     const load = () => api.nearby(origin).then((r) => { if (current) setNearby(r); }).catch(() => {});
     load();
-    const id = setInterval(load, 20000); // arrival times move with the buses
+    // Arrival times move with the buses; refresh faster while you're standing at a stop.
+    const id = setInterval(load, atStopId ? 10000 : 20000);
     return () => { current = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originKey]);
+  }, [originKey, Boolean(atStopId)]);
 
   const lineById = useMemo(() => new Map((network?.lines ?? []).map((l) => [l.id, l])), [network]);
   const alert = useBusAlert(lineById, lang);
   const stopById = useMemo(() => new Map((network?.stops ?? []).map((st) => [st.id, st])), [network]);
   const placeById = useMemo(() => new Map((network?.places ?? []).map((p) => [p.id, p])), [network]);
+
+  // Reached a stop? Only with a real position (GPS / Follow me / demo walk), never the demo
+  // fallback spot or a typed start place. 40 m to arrive, 70 m to leave (so it doesn't flicker).
+  const realPosition = !originPlace && !here.demo && locStatus?.kind === 'ok';
+  useEffect(() => {
+    if (!network || !realPosition) { setAtStopId(null); return; }
+    let nearest = null;
+    for (const st of network.stops) {
+      const m = kmBetween(here, st) * 1000;
+      if (!nearest || m < nearest.m) nearest = { id: st.id, m };
+    }
+    const arriveM = Math.max(40, Math.min(accuracyM ?? 0, 80));
+    setAtStopId((cur) => {
+      if (cur && cur === nearest.id && nearest.m <= 70) return cur; // still here
+      if (nearest.m <= arriveM) {
+        if (cur !== nearest.id) navigator.vibrate?.(120);
+        return nearest.id;
+      }
+      return null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [network, here, realPosition]);
+  useEffect(() => { if (!atStopId) setDismissedStopId(null); }, [atStopId]);
+  const atStop = atStopId && atStopId !== dismissedStopId
+    ? nearby?.stops.find((st) => st.stopId === atStopId) ?? null
+    : null;
+  // If a route is open and you board here, that bus is "your bus".
+  const firstBusLeg = selected?.legs.find((l) => l.type === 'bus');
+  const yourBus = firstBusLeg && firstBusLeg.from.stopId === atStopId ? { lineId: firstBusLeg.lineId, dir: firstBusLeg.dir } : null;
+  // Part of the page (never floating over map controls); scroll up so it's seen on arrival.
+  const stopCard = atStop && (
+    <AtStopCard stop={atStop} now={now} lineById={lineById} lang={lang} yourBus={yourBus} onClose={() => setDismissedStopId(atStopId)} />
+  );
+  useEffect(() => {
+    if (atStopId) panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [atStopId]);
 
   const focusLineIds = useMemo(() => {
     if (!destination) return lineFocusId ? new Set([lineFocusId]) : null;
@@ -490,6 +530,7 @@ export default function App() {
       </header>
 
       <div className="space-y-5 px-4 pb-6 pt-3">
+        {stopCard}
         {/* From / To */}
         <div className="relative space-y-2">
           <PlaceSearch
@@ -589,7 +630,7 @@ export default function App() {
             )}
             {planning && <p className="text-sm text-ink-soft" role="status">{s.thinking}</p>}
             {plan && !planning && (
-              <RouteOptions plan={plan} lineById={lineById} lang={lang} onSelect={(o) => { setSelected(o); setSheetOpen(false); }} />
+              <RouteOptions plan={plan} lineById={lineById} lang={lang} onSelect={(o) => { setSelected(o); setSheetOpen(false); panelRef.current?.scrollTo({ top: 0 }); }} />
             )}
           </Fragment>
         )}
@@ -615,6 +656,7 @@ export default function App() {
   const nearbyPage = (
     <div className="space-y-4 px-4 pb-6 pt-5">
       <h1 id="nearby-page-h" className="text-xl font-bold">{s.nearbyTitle}</h1>
+      {stopCard}
       <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3.5 py-2.5 text-sm ring-1 ring-line">
         <span className="flex min-w-0 items-center gap-2 text-ink-soft">
           <span className="size-2.5 shrink-0 rounded-full border-2 border-blue-600" />
@@ -666,6 +708,7 @@ export default function App() {
               onAirport={() => placeById.get('kti') && chooseDestination(placeById.get('kti'))}
               onNearby={() => navigate('nearby')}
               onBell={() => (alert.watch ? openPlanner(null) : navigate('settings'))}
+              stopCard={stopCard}
               locationNotice={!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} onChooseStart={() => openPlanner('from')} />}
               isDesktop={isDesktop}
             />
