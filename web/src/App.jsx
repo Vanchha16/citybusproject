@@ -177,18 +177,30 @@ export default function App() {
   // Why we are (not) using the real position, so the app can say so instead of silently showing
   // the demo spot: { kind: 'ok' | 'rough' | 'far' | 'denied' | 'unavailable' | 'timeout' | 'unsupported', km? }
   const [locStatus, setLocStatus] = useState(null);
+  const [accuracyM, setAccuracyM] = useState(null);
+  const hereRef = useRef(here);
+  useEffect(() => { hereRef.current = here; }, [here]);
+
+  /** Turn a browser position into `here` + a status. `minMoveM` ignores GPS jitter while walking. */
+  const applyFix = useCallback((pos, minMoveM = 0) => {
+    const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const km = kmBetween(p, PP_CENTER);
+    const inCity = km < 40;
+    setAccuracyM(inCity ? pos.coords.accuracy : null);
+    const prev = hereRef.current;
+    const moved = prev.demo || kmBetween(prev, p) * 1000 >= minMoveM;
+    // Use it if it's in Phnom Penh, even when rough (better than nothing) — but say it's a guess.
+    if (!inCity) setHere(DEMO_LOCATION);
+    else if (moved) setHere(p);
+    if (pos.coords.accuracy > ROUGH_M) setLocStatus({ kind: 'rough', km: Math.max(1, Math.round(pos.coords.accuracy / 1000)) });
+    else setLocStatus(inCity ? { kind: 'ok' } : { kind: 'far', km: Math.round(km) });
+  }, []);
+
   const locate = useCallback(async () => {
     if (!navigator.geolocation) { setLocStatus({ kind: 'unsupported' }); return; }
     setLocating(true);
     const fix = (opts) => new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, opts));
-    const apply = (pos) => {
-      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      const km = kmBetween(p, PP_CENTER);
-      // Use it if it's in Phnom Penh, even when rough (better than nothing) — but say it's a guess.
-      setHere(km < 40 ? p : DEMO_LOCATION);
-      if (pos.coords.accuracy > ROUGH_M) setLocStatus({ kind: 'rough', km: Math.max(1, Math.round(pos.coords.accuracy / 1000)) });
-      else setLocStatus(km < 40 ? { kind: 'ok' } : { kind: 'far', km: Math.round(km) });
-    };
+    const apply = (pos) => applyFix(pos);
     let first;
     try {
       // 1) Quick Wi-Fi/cell fix: fast, works indoors. Shown straight away — no waiting for GPS.
@@ -210,8 +222,42 @@ export default function App() {
         .then((better) => { if (better.coords.accuracy < first.coords.accuracy) apply(better); })
         .catch(() => { /* keep the rough fix and its message */ });
     }
-  }, []);
+  }, [applyFix]);
   useEffect(() => { locate(); }, [locate]);
+
+  // Follow me: keep tracking the position while walking. Off by default (battery).
+  const [following, setFollowing] = useState(false);
+  useEffect(() => {
+    if (!following) return undefined;
+    if (!navigator.geolocation) {
+      setLocStatus({ kind: 'unsupported' });
+      setFollowing(false);
+      return undefined;
+    }
+    setOriginPlace(null); // following means "start from where I am"
+    const id = navigator.geolocation.watchPosition(
+      (pos) => applyFix(pos, 25), // re-plan / refresh nearby stops only after ~25 m of real movement
+      (err) => {
+        if (err.code === 1) {
+          setLocStatus({ kind: 'denied' });
+          setFollowing(false);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [following, applyFix]);
+  // Choosing a different start place stops following.
+  useEffect(() => { if (originPlace) setFollowing(false); }, [originPlace]);
+  // Dragging the map while following pauses the camera (tracking continues) until re-centred.
+  const [followPaused, setFollowPaused] = useState(false);
+  const onUserPan = useCallback(() => setFollowPaused(true), []);
+  /** Off → follow. Following but map dragged away → re-centre. Following and centred → off. */
+  const toggleFollow = () => {
+    if (!following) { setFollowing(true); setFollowPaused(false); }
+    else if (followPaused) setFollowPaused(false);
+    else setFollowing(false);
+  };
 
   // Plan whenever start or destination changes (unless the assistant already returned this plan).
   const planKey = destination ? `${pointKey(origin)}>${pointKey(destination)}` : '';
@@ -496,9 +542,14 @@ export default function App() {
           <span className="size-2.5 shrink-0 rounded-full border-2 border-blue-600" />
           <span className="truncate">{originText}</span>
         </span>
-        <button type="button" onClick={locate} className="flex shrink-0 items-center gap-1.5 font-semibold text-blue-700">
+        <button
+          type="button"
+          onClick={toggleFollow}
+          aria-pressed={following}
+          className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold ${following ? 'bg-blue-600 text-white' : 'text-blue-700 ring-1 ring-blue-200 hover:bg-blue-50'}`}
+        >
           <LocateIcon />
-          {locating ? s.locating : s.refreshLocation}
+          {following ? s.following : s.followMe}
         </button>
       </div>
       {!originPlace && <LocationNotice status={locStatus} locating={locating} lang={lang} onRetry={locate} onChooseStart={() => openPlanner('from')} />}
@@ -570,6 +621,29 @@ export default function App() {
         <div className="pointer-events-none absolute bottom-6 left-3 z-[1050] hidden md:block">
           <BusLegend summary={summary} lang={lang} />
         </div>
+        {/* Follow me: top-left on phones (the sheet covers the bottom), bottom-right on desktop. */}
+        <div className="absolute left-3 top-3 z-[1050] flex items-center gap-2 md:bottom-6 md:left-auto md:right-3 md:top-auto md:flex-row-reverse">
+          <button
+            type="button"
+            onClick={toggleFollow}
+            aria-pressed={following}
+            aria-label={s.followMe}
+            title={s.followMe}
+            data-state={!following ? 'off' : followPaused ? 'paused' : 'on'}
+            className={`flex size-11 items-center justify-center rounded-full shadow-md ring-1 ${
+              following && !followPaused ? 'bg-blue-600 text-white ring-blue-700'
+                : following ? 'bg-white text-blue-600 ring-2 ring-blue-600'
+                  : 'bg-white text-ink ring-line hover:bg-mist'
+            }`}
+          >
+            <LocateIcon className="size-5" />
+          </button>
+          {following && (
+            <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-md" role="status">
+              {s.following}
+            </span>
+          )}
+        </div>
         {network && (
           <MapView
             network={network}
@@ -581,6 +655,10 @@ export default function App() {
             option={selected}
             lang={lang}
             fitPadding={fitPadding}
+            follow={following}
+            followPaused={followPaused}
+            onUserPan={onUserPan}
+            accuracyM={originPlace ? null : accuracyM}
           />
         )}
       </main>

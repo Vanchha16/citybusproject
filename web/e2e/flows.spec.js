@@ -191,6 +191,51 @@ test.describe('your location: only a rough guess (e.g. from the internet connect
   });
 });
 
+test.describe('follow me while walking', () => {
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: 11.5640, longitude: 104.9307 } }); // Royal Palace
+
+  test('nearby stops update as you move, and stop updating when turned off', async ({ page, context }) => {
+    const s = await openHome(page);
+    await nav(page, s, 'nearby').click();
+    const panel = page.locator('aside');
+    const firstStop = page.locator('section[aria-labelledby="nearby-page-h"] > ul > li').first();
+    await expect(firstStop).toContainText('Royal Palace');
+
+    await panel.getByRole('button', { name: s.followMe }).click();
+    await expect(panel.getByRole('button', { name: s.following })).toHaveAttribute('aria-pressed', 'true');
+
+    await context.setGeolocation({ latitude: 11.6018, longitude: 104.8856 }); // walk (well, ride) to AEON Sen Sok
+    await expect(firstStop).toContainText('AEON Mall Sen Sok City', { timeout: 15_000 });
+
+    await panel.getByRole('button', { name: s.following }).click(); // turn off
+    await context.setGeolocation({ latitude: 11.5385, longitude: 104.9178 }); // Russian Market
+    await page.waitForTimeout(2500);
+    await expect(firstStop).toContainText('AEON Mall Sen Sok City'); // not following any more
+  });
+
+  test('map button: follow, pause by dragging the map, re-centre, turn off', async ({ page }) => {
+    const s = await openHome(page);
+    await page.getByRole('button', { name: s.openMap }).or(nav(page, s, 'directions')).first().click();
+    const follow = page.locator('main').getByRole('button', { name: s.followMe });
+    await expect(follow).toHaveAttribute('data-state', 'off');
+    await follow.click();
+    await expect(follow).toHaveAttribute('data-state', 'on');
+    await expect(page.locator('main').getByText(s.following)).toBeVisible();
+
+    const map = await page.locator('.leaflet-container').boundingBox();
+    await page.mouse.move(map.x + map.width / 2, map.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(map.x + map.width / 2 - 120, map.y + 140, { steps: 8 });
+    await page.mouse.up();
+    await expect(follow).toHaveAttribute('data-state', 'paused');
+
+    await follow.click(); // re-centre
+    await expect(follow).toHaveAttribute('data-state', 'on');
+    await follow.click(); // off
+    await expect(follow).toHaveAttribute('data-state', 'off');
+  });
+});
+
 test.describe('your location: blocked', () => {
   test.use({ permissions: [] });
 

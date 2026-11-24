@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
 import { label, t } from '../i18n.js';
 
 const PHNOM_PENH = [11.556, 104.92];
@@ -52,9 +52,34 @@ function busIcon(code, color, status) {
 }
 
 /** Keeps the view on whatever matters right now: the selected route, or origin + destination. */
-function FitView({ bounds, padding }) {
+/**
+ * Follow me: keep the user's dot in view while walking. Dragging the map pauses
+ * this (so people can look around) until they re-centre with the Follow button.
+ */
+function FollowCamera({ follow, paused, position, onUserPan }) {
   const map = useMap();
-  const key = JSON.stringify(bounds);
+  useEffect(() => {
+    if (!follow) return undefined;
+    const onDrag = () => onUserPan?.();
+    map.on('dragstart', onDrag);
+    return () => map.off('dragstart', onDrag);
+  }, [follow, map, onUserPan]);
+  // Turning follow on (or re-centring) zooms in to street level once.
+  useEffect(() => {
+    if (follow && !paused && position) map.flyTo(position, Math.max(map.getZoom(), 16), { duration: 0.6 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [follow, paused]);
+  // Then just glide along as the position updates.
+  useEffect(() => {
+    if (follow && !paused && position) map.panTo(position, { animate: true, duration: 0.5 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position?.[0], position?.[1]]);
+  return null;
+}
+
+function FitView({ bounds, padding, fitKey }) {
+  const map = useMap();
+  const key = fitKey ?? JSON.stringify(bounds);
   useEffect(() => {
     if (!bounds || bounds.length === 0) return;
     const opts = { paddingTopLeft: padding.topLeft, paddingBottomRight: padding.bottomRight, duration: 0.6, maxZoom: 16 };
@@ -65,7 +90,10 @@ function FitView({ bounds, padding }) {
   return null;
 }
 
-export default function MapView({ network, buses, origin, destination, focusLineIds, lineFocusId, option, lang, fitPadding }) {
+export default function MapView({
+  network, buses, origin, destination, focusLineIds, lineFocusId, option, lang, fitPadding,
+  follow = false, followPaused = false, onUserPan, accuracyM = null,
+}) {
   const s = t(lang);
   const lineById = useMemo(() => new Map(network.lines.map((l) => [l.id, l])), [network]);
   const focused = (id) => !focusLineIds || focusLineIds.has(id);
@@ -93,6 +121,12 @@ export default function MapView({ network, buses, origin, destination, focusLine
     if (lineFocusId) return lineById.get(lineFocusId)?.geometry ?? null;
     return null; // nothing chosen yet: keep the city-wide overview
   }, [option, origin, destination, lineFocusId, lineById]);
+
+  // While following, walking must not re-fit the whole view on every step: only a new
+  // route/destination/line does. (Otherwise the camera would fight the follow camera.)
+  const fitKey = follow
+    ? `${option?.id ?? ''}|${revealKey}`
+    : undefined;
 
   return (
     <MapContainer center={PHNOM_PENH} zoom={12} zoomControl={false} className="h-full w-full" attributionControl>
@@ -184,12 +218,22 @@ export default function MapView({ network, buses, origin, destination, focusLine
         );
       })}
 
+      {/* How sure we are about your position: a soft circle around the dot. */}
+      {origin && accuracyM > 15 && accuracyM < 3000 && (
+        <Circle
+          center={[origin.lat, origin.lng]}
+          radius={accuracyM}
+          interactive={false}
+          pathOptions={{ color: '#2563eb', weight: 1, opacity: 0.35, fillColor: '#2563eb', fillOpacity: 0.1 }}
+        />
+      )}
       {origin && <Marker position={[origin.lat, origin.lng]} icon={meIcon} zIndexOffset={900} keyboard={false} />}
       {destination && (
         <Marker key={revealKey} position={[destination.lat, destination.lng]} icon={destIcon} zIndexOffset={1000} keyboard={false} />
       )}
 
-      <FitView bounds={bounds} padding={fitPadding} />
+      <FitView bounds={bounds} padding={fitPadding} fitKey={fitKey} />
+      <FollowCamera follow={follow} paused={followPaused} position={origin ? [origin.lat, origin.lng] : null} onUserPan={onUserPan} />
     </MapContainer>
   );
 }
