@@ -1,0 +1,144 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: "Kantumruy Pro", system-ui, sans-serif;
+  --color-ink: #15233f;
+  --color-ink-soft: #4a5873;
+  --color-ink-faint: #5f6b80;
+  --color-paper: #ffffff;
+  --color-mist: #eef1f5;
+  --color-line: #dde2ea;
+  --color-signal: #ffc629;
+  --color-walk: #5b6b8a;
+}
+
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-mist);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum";
+}
+/* Khmer script needs more vertical room than Latin. */
+:lang(km) { line-height: 1.7; }
+
+/* In the base layer so utilities (e.g. on fields that show focus with their own ring) can override it. */
+@layer base {
+  :focus-visible { outline: 3px solid var(--color-signal); outline-offset: 2px; }
+}
+
+.leaflet-container { font-family: var(--font-sans); background: #e9edf2; }
+/* Quiet basemap so the coloured bus lines carry the meaning. */
+.leaflet-tile-pane { filter: grayscale(0.9) brightness(1.04) contrast(0.92); }
+.leaflet-control-attribution { font-size: 10px; }
+
+.bus-marker {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 20px;
+  border-radius: 10px; border: 2px solid #fff;
+  color: #fff; font-weight: 700; font-size: 11px; line-height: 1;
+  box-shadow: 0 1px 3px rgb(21 35 63 / 0.35);
+}
+/* GPS trust states — the same marks are used in the legend. */
+.bus-marker.is-estimated { border-style: dashed; opacity: 0.8; }
+.bus-marker.is-lost { border-style: dashed; opacity: 0.45; }
+.bus-marker.is-suspect { background: #9aa3b2 !important; color: #fff; border-color: #fff; opacity: 0.9; }
+
+.legend-bus {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 13px; border-radius: 7px;
+  background: var(--color-ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--color-ink);
+  color: #fff; font-size: 9px; font-weight: 700; line-height: 1;
+}
+.legend-bus.is-estimated { border-style: dashed; opacity: 0.8; }
+.legend-bus.is-suspect { background: #9aa3b2; box-shadow: 0 0 0 1px #9aa3b2; }
+
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #16a34a;
+  box-shadow: 0 0 0 0 rgb(22 163 74 / 0.5);
+  animation: live-pulse 1.6s infinite;
+}
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(22 163 74 / 0.5); }
+  80% { box-shadow: 0 0 0 6px rgb(22 163 74 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(22 163 74 / 0); }
+}
+
+.me-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #2563eb; border: 3px solid #fff;
+  animation: me-pulse 2s infinite;
+}
+@keyframes me-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(37 99 235 / 0.45); }
+  70% { box-shadow: 0 0 0 14px rgb(37 99 235 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(37 99 235 / 0); }
+}
+.dest-pin svg { filter: drop-shadow(0 2px 2px rgb(21 35 63 / 0.35)); }
+
+/* Home live-map card: buses glide between position updates (every 4 s). */
+.preview-bus { transition: transform 4s linear; }
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #dc2626;
+  animation: rec-blink 1.4s ease-in-out infinite;
+}
+@keyframes rec-blink { 50% { opacity: 0.25; } }
+
+/* ---------- Destination reveal: one orchestrated moment ----------
+   0 ms    camera flies, unrelated lines fade, pin drops
+   350 ms  lines that serve the destination draw themselves toward it
+   450 ms  ripple under the pin
+   panel   card rises, line badges pop, route options cascade */
+
+/* Lines fade instead of snapping when the destination filter changes. */
+.leaflet-overlay-pane path { transition: stroke-opacity 450ms ease, stroke-width 300ms ease; }
+
+/* A path drawn from one end to the other (needs pathLength="1" on the element). */
+.line-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: var(--draw-from, 1);
+  animation: line-draw var(--draw-dur, 1100ms) cubic-bezier(0.65, 0, 0.35, 1) var(--draw-delay, 0ms) forwards;
+}
+@keyframes line-draw { to { stroke-dashoffset: 0; } }
+
+.route-fade { opacity: 0; animation: fade-in 300ms ease var(--draw-delay, 0ms) forwards; }
+@keyframes fade-in { to { opacity: 1; } }
+
+.dest-wrap { position: relative; width: 30px; height: 40px; }
+.dest-drop { transform-origin: 50% 100%; animation: pin-drop 560ms cubic-bezier(0.3, 1.45, 0.55, 1) both; }
+@keyframes pin-drop {
+  0% { transform: translateY(-48px) scaleY(1.08); opacity: 0; }
+  45% { opacity: 1; }
+  70% { transform: translateY(0) scaleY(0.9); }
+  100% { transform: none; }
+}
+.dest-ripple {
+  position: absolute; left: 50%; bottom: -3px;
+  width: 16px; height: 7px; margin-left: -8px;
+  border: 2px solid var(--color-signal); border-radius: 50%;
+  opacity: 0;
+  animation: ripple 1000ms ease-out 450ms 2;
+}
+@keyframes ripple {
+  0% { transform: scale(0.5); opacity: 0.95; }
+  100% { transform: scale(4.5); opacity: 0; }
+}
+
+/* Panel choreography; --d sets each element's place in the sequence. */
+.rise { animation: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+.pop { display: inline-flex; animation: pop 360ms cubic-bezier(0.3, 1.6, 0.5, 1) var(--d, 0ms) both; }
+@keyframes pop { from { opacity: 0; transform: scale(0.5); } }
+.drop-in { transform-origin: top; animation: drop-in 160ms ease-out both; }
+@keyframes drop-in { from { opacity: 0; transform: translateY(-4px) scaleY(0.96); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .line-draw, .route-fade, .dest-drop, .dest-ripple, .rise, .pop, .drop-in { animation: none !important; }
+  .line-draw { stroke-dasharray: none; }
+  .route-fade { opacity: 1; }
+  .me-dot, .live-dot, .rec-dot { animation: none; }
+  * { transition: none !important; scroll-behavior: auto !important; }
+}

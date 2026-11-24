@@ -1,0 +1,25 @@
+{
+  "name": "citybus",
+  "private": true,
+  "description": "City Bus smart route finder prototype (CamDX Hackathon 2026)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web",
+    "start": "npm run start -w server",
+    "test": "npm test -w server && npm test -w web",
+    "shapes": "npm run shapes -w server",
+    "test:e2e": "npm run test:e2e -w web",
+    "test:all": "npm test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
