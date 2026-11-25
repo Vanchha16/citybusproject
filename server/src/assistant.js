@@ -4,7 +4,7 @@
 // the plan. Claude only does step 1, so it can never make up a bus route.
 // Without an API key, step 1 falls back to a keyword parser.
 import Anthropic from '@anthropic-ai/sdk';
-import { places } from './data/network.js';
+import { places } from './data/dataset.js';
 import { catalogueText, findMentions, getPlace, isKhmer, normalize } from './search.js';
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-5-5';

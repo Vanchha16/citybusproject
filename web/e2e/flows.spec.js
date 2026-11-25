@@ -357,6 +357,30 @@ test.describe('arriving at a bus stop', () => {
     await expect(card.locator('[data-your-bus]')).toHaveCount(0); // you don't board there
   });
 
+  test('one tap reports the bus to everyone, and the operator sees it', async ({ page, context }) => {
+    const s = await openHome(page);
+    await page.getByRole('button', { name: s.openMap }).or(nav(page, s, 'directions')).first().click();
+    await page.locator('main').getByRole('button', { name: s.followMe }).click();
+    await context.setGeolocation({ latitude: 11.5697, longitude: 104.9211 }); // the Central Market stop
+    const card = page.locator('section[aria-labelledby="atstop-h"]');
+    await expect(card).toBeVisible({ timeout: 15_000 });
+
+    const box = card.locator('[data-report]');
+    await expect(box).toContainText(/Is bus .+ here\?/);
+    const line = await box.locator('[data-line]').getAttribute('data-line');
+    await box.getByRole('button', { name: s.report.full }).click();
+    await expect(card.getByRole('status')).toContainText(s.report.thanks.full);
+    // (That "full" then shows on the bus at later stops is covered by server/test/reports.test.js;
+    // here the bus may already have left this stop by the next refresh.)
+
+    await page.goto('/operator');
+    await expect(page.getByRole('heading', { name: s.ops.title })).toBeVisible();
+    const row = page.locator('[data-report-row="full"]').filter({ hasText: 'Central Market' }).first();
+    await expect(row).toBeVisible();
+    await expect(row.locator('[data-line]')).toHaveAttribute('data-line', line);
+    await expect(page.locator('[data-issue="crowded"]').first()).toBeVisible();
+  });
+
   test('can be closed', async ({ page, context }) => {
     const s = await openHome(page);
     await page.getByRole('button', { name: s.openMap }).or(nav(page, s, 'directions')).first().click();

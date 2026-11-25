@@ -10,7 +10,7 @@ Only the airport buses (AEB, AX2) stay highlighted, with route options from wher
 > ⚠️ **Sample data.** Stops are approximate. Lines are illustrative: AEB is loosely modelled on
 > the real Airport Express Bus; the others are made up. Codes like 1A or 2A follow the official
 > numbering style but do not match the real routes with those numbers. Bus positions and times are simulated
-> from headways. Replace `server/src/data/network.js` with official City Bus data before real use.
+> from headways. Load official City Bus data with `npm run import:gtfs` (see below) before real use.
 
 ## Run it
 
@@ -31,10 +31,37 @@ Other commands:
 |---|---|
 | `npm test` | Planner, timetable, parser and search tests |
 | `npm run build && npm start` | Production build served by the API on :8787 |
-| `npm run shapes` | Re-fetch road geometry for lines (run after editing stops/lines) |
+| `npm run shapes` | Fetch road geometry for lines that have none (`-- --all` to re-fetch every line) |
+| `npm run import:gtfs -- feed.zip` | Load official bus data (GTFS). `-- --remove` goes back to the sample |
 
 If GPS is off, or you're outside Phnom Penh, the app starts from **Central Market (demo location)**.
 To demo at night when buses are out of service, set `DEMO_CLOCK=08:30` in `server/.env`.
+
+## Official bus data (GTFS)
+
+When the City Bus Authority or the organisers share their timetable as a **GTFS feed** (a `.zip` of
+CSV files, the standard format transit agencies publish):
+
+```bash
+npm run import:gtfs -- path/to/feed.zip     # or an unzipped folder
+npm run dev                                  # restart: the app now runs on the official network
+```
+
+The command prints every line it found and anything it could not model. It writes
+`server/src/data/imported/`; commit that folder to deploy the data. How the feed is turned into
+the app's model (`server/src/gtfs.js`):
+
+- **Stops and lines:** only the stops a line uses. Khmer names come from `translations.txt`. Without
+  them, the English name is shown in Khmer mode and the import says how many are missing.
+- **Stop order:** the most common pattern each way. If the way back uses other streets, it keeps its
+  own stop list. Short trips and other variants are reported, not modelled.
+- **Timing:** a normal weekday service. Headway from `frequencies.txt` or the gaps between trips,
+  service hours from the first and last trip, speed from scheduled trip times.
+- **Road shapes:** from `shapes.txt`, cut at each stop. Lines without one: `npm run shapes`.
+- **Landmarks** (the airport, markets…) stay in `network.js`. Lines near the airport are marked as airport lines.
+
+Bus positions stay simulated until a real GPS feed is connected (`server/src/simulation.js` is the
+only file to replace). Tests always run on the sample network (`CITYBUS_DATA=sample`).
 
 ## Pitch demo
 
@@ -44,6 +71,23 @@ airport buses, open the best route, set an alert, walk to the stop with the map 
 switch to Khmer, ask in Khmer. It runs at **09:00 Phnom Penh time** whatever the real time, so
 rehearsals at night work. Controls: → / Page Down / Space (next), ← / Page Up (back),
 Home (first step), Esc (exit). Presentation clickers work too.
+
+## Passenger reports (GPS + timetable + passengers)
+
+When you reach a stop, the stop card asks about the next bus: **It's here**, **Didn't come**
+(only once the bus is due) or **Too full**. One tap changes what everyone else sees
+(`server/src/reports.js`, `server/src/realtime.js`):
+
+| Report | What it changes |
+|---|---|
+| It's here | A bus whose GPS dropped out or froze is placed at that stop and its delay is measured. A frozen GPS unit no longer hides a real bus. |
+| Didn't come | 1 person: other passengers see a warning. 2 different people: that bus is removed from arrival times (unless its GPS is live). |
+| Too full | Passengers at later stops see "Full" on that bus. |
+
+Operators open **`/operator`** (or Settings → Operator view): report counts for the last hour, and what
+to act on: buses that didn't come, GPS units to repair, lines that need more buses.
+Limits: `REPORTS_PER_10_MIN` (12) per person. Reports are kept in memory for 3 hours, per running
+instance. For real use, move them to a shared database so every server and the operator see the same reports.
 
 ## AI answers and cost protection
 
@@ -112,7 +156,10 @@ web/ (React + Leaflet + Tailwind)        server/ (Node + Express)
                                           search.js     bilingual place search
                                           assistant.js  question → {origin, destination}
                                           describe.js   itinerary → Khmer/English steps
-                                          data/         network.js (stops, lines, places), shapes.json
+                                          realtime.js   GPS + passenger reports → positions, ETAs
+                                          reports.js    passenger reports (here / didn't come / full)
+                                          gtfs.js       official GTFS feed → stops and lines
+                                          data/         network.js (sample stops, lines, places), imported/ (GTFS)
 ```
 
 **The AI never invents routes.** Claude (or the keyword fallback) only works out *where* the
@@ -135,10 +182,11 @@ Alternatives come from banning lines used by earlier options.
 | `GET /api/buses` | Fused bus positions with status (live/estimated/lost/suspect) and counts |
 | `GET /api/arrivals?stopId&lineId&dir` | Next 3 arrivals of a line at a stop (used by alerts) |
 | `POST /api/assistant` `{message, location}` | Free-text question → answer + plan |
+| `POST /api/reports` `{kind, stopId, lineId, dir, tripId}` | Passenger report: `came`, `missed` or `full` |
+| `GET /api/reports` | Operator view: last hour's reports, counts and issues |
 
 ## Ideas for the hackathon days
 
-- Load official GTFS data instead of `network.js`
 - Real GPS feed for bus positions and live ETAs
 - Voice input (Khmer speech-to-text)
 - Show fares and accessibility information per line

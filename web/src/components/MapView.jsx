@@ -193,7 +193,7 @@ export default function MapView({
 
       {network.stops.map((st) => {
         const onRoute = option?.legs.some((l) => l.type === 'bus' && l.stopIds.includes(st.id));
-        const servesFocus = !option && focusLineIds && network.lines.some((l) => focusLineIds.has(l.id) && l.stops.includes(st.id));
+        const servesFocus = !option && focusLineIds && network.lines.some((l) => focusLineIds.has(l.id) && (l.stops.includes(st.id) || l.stopsBack?.includes(st.id)));
         const strong = onRoute || servesFocus;
         return (
           <CircleMarker
@@ -212,7 +212,12 @@ export default function MapView({
         const hidden = routeLineIds ? !routeLineIds.has(b.lineId) : !focused(b.lineId);
         if (hidden) return null; // only show buses that matter for this trip
         const age = Math.max(1, Math.round(b.gpsAgeMin));
-        const statusText = b.status === 'suspect' ? s.status.suspect(b.stillMin) : s.status[b.status](age);
+        const seen = b.reports?.seen;
+        const statusText = b.confirmedBy === 'passenger' && seen
+          ? `${s.seenByPassenger(label(seen.stopName, lang), seen.minAgo)}${b.gpsFault ? ` (${s.gpsFault})` : ''}`
+          : b.status === 'suspect'
+            ? (b.reason === 'passengers' ? s.reportedMissing : s.status.suspect(b.stillMin))
+            : s.status[b.status](age);
         return (
           <Marker
             key={b.id}
@@ -226,6 +231,7 @@ export default function MapView({
               <br />
               {statusText}
               {b.status !== 'suspect' && <>, {s.late(Math.round(b.delayMin)).toLowerCase()}</>}
+              {b.reports?.full && <>, {s.note.full.toLowerCase()}</>}
             </Tooltip>
           </Marker>
         );

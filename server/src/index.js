@@ -2,19 +2,21 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { stops, lines, places } from './data/network.js';
+import { stops, lines, places, dataSource } from './data/dataset.js';
 import { patterns, lineGeometry, nowMinutes, boardingsAtStop, hasRoadShapes, stopById } from './schedule.js';
-import { vehiclesAt, summarize, predictArrivals, annotateWithRealtime } from './realtime.js';
+import { vehiclesAt, summarize, predictArrivals, annotateWithRealtime, reportIndexAt } from './realtime.js';
+import { reports, KINDS, parseTripId } from './reports.js';
 import { planTrip, stopsNear, linesServing } from './planner.js';
 import { searchPlaces } from './search.js';
 import { understand, resolvePlace, aiEnabled } from './assistant.js';
 import { composeAnswer } from './describe.js';
 import { haversine } from './geo.js';
-import { createLimiter, clientId } from './ratelimit.js';
+import { createLimiter, createReportLimiter, clientId } from './ratelimit.js';
 
 const app = express();
 app.use(express.json({ limit: '20kb' }));
 const limiter = createLimiter();
+const reportLimiter = createReportLimiter();
 
 // Demo mode: the app can ask for the network "as at" a time of day (X-Demo-Clock header,
 // minutes since midnight), so a demo or rehearsal at night still shows buses running.
@@ -60,7 +62,7 @@ function nearby(point, t) {
   return { stops: nearStops, places: nearPlaces };
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, ai: aiEnabled, roadShapes: hasRoadShapes, now: nowMinutes() }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, ai: aiEnabled, roadShapes: hasRoadShapes, data: dataSource, now: nowMinutes() }));
 
 app.get('/api/network', (req, res) => {
   res.json({
@@ -72,6 +74,7 @@ app.get('/api/network', (req, res) => {
       headsigns: patterns[l.id].map((p) => p.headsign),
     })),
     ai: aiEnabled,
+    data: dataSource,
     now: req.now,
   });
 });
@@ -124,6 +127,102 @@ app.get('/api/arrivals', (req, res) => {
     dir,
     headsign: pattern.headsign,
     arrivals: predictArrivals(pattern, idx, t, vehiclesAt(t), 3),
+  });
+});
+
+/**
+ * A passenger at a stop reports the bus they were waiting for: here, didn't come, or full.
+ * Body: { kind, stopId, lineId, dir, tripId } — tripId comes from the arrival the app showed.
+ */
+app.post('/api/reports', (req, res) => {
+  const { kind, stopId, lineId, tripId } = req.body ?? {};
+  const dir = Number(req.body?.dir);
+  if (!KINDS.includes(kind)) return res.status(400).json({ error: `kind must be one of ${KINDS.join(', ')}` });
+  const pattern = patterns[lineId]?.[dir];
+  const idx = pattern ? pattern.stopIds.indexOf(stopId) : -1;
+  if (idx < 0) return res.status(400).json({ error: 'Unknown stopId/lineId/dir combination' });
+  const trip = parseTripId(tripId);
+  const realTrip = trip && trip.lineId === lineId && trip.dir === dir
+    && trip.dep >= pattern.firstDeparture && trip.dep <= pattern.lastDeparture
+    && (trip.dep - pattern.firstDeparture) % pattern.headway === 0;
+  if (!realTrip) return res.status(400).json({ error: 'Unknown tripId' });
+  // Only about a bus that is due here around now (an hour either way covers very late buses).
+  if (Math.abs(req.now - (trip.dep + pattern.offsets[idx])) > 60) {
+    return res.status(400).json({ error: 'That bus is not due at this stop now' });
+  }
+  const who = clientId(req);
+  const gate = reportLimiter.check(who);
+  if (!gate.allowed) {
+    res.set('Retry-After', String(gate.retryAfterSec));
+    return res.status(429).json({ error: 'Too many reports. Please try again later.', retryAfterSec: gate.retryAfterSec });
+  }
+  const { duplicate } = reports.add({ kind, stopId, lineId, dir, tripId, at: req.now, client: who });
+  res.status(duplicate ? 200 : 201).json({ ok: true, duplicate });
+});
+
+/** Operator view: what passengers reported in the last hour, and the problems it points to. */
+app.get('/api/reports', (req, res) => {
+  const t = req.now;
+  const windowMin = 60;
+  const recent = reports.since(t, windowMin);
+  const vehicles = vehiclesAt(t);
+  const vehicleById = new Map(vehicles.map((v) => [v.id, v]));
+  const index = reportIndexAt(t);
+  const minAgo = (at) => Math.max(0, Math.round(t - at));
+  const counts = Object.fromEntries(KINDS.map((k) => [k, recent.filter((r) => r.kind === k).length]));
+
+  const issues = [];
+  // GPS unit frozen, but passengers keep seeing the bus: fix the unit.
+  for (const v of vehicles) {
+    if (v.gpsFault) {
+      issues.push({ type: 'gps-frozen', lineId: v.lineId, dir: v.dir, busNo: v.busNo, tripId: v.id, stopId: v.reports.seen.stopId, minAgo: v.reports.seen.minAgo });
+    }
+  }
+  // Passengers say a bus didn't come: a ghost on the map, a skipped stop, or a cancelled trip.
+  for (const [tripId, sum] of index) {
+    if (!sum.missed) continue;
+    const last = recent.filter((r) => r.tripId === tripId && r.kind === 'missed').at(-1);
+    if (!last) continue;
+    const v = vehicleById.get(tripId);
+    issues.push({
+      type: 'no-show', lineId: last.lineId, dir: last.dir, busNo: v?.busNo ?? null, tripId,
+      stopId: last.stopId, count: sum.missed, minAgo: minAgo(last.at),
+      gps: v ? (v.reason === 'passengers' ? 'dropped' : v.status) : 'none',
+    });
+  }
+  // Lines where buses are too full to board: candidates for more buses at this hour.
+  const crowded = new Map();
+  for (const r of recent) {
+    if (r.kind !== 'full') continue;
+    const k = `${r.lineId}|${r.dir}`;
+    const c = crowded.get(k) ?? { type: 'crowded', lineId: r.lineId, dir: r.dir, count: 0, trips: new Set() };
+    c.count++;
+    c.trips.add(r.tripId);
+    crowded.set(k, c);
+  }
+  for (const { trips, ...c } of crowded.values()) issues.push({ ...c, buses: trips.size });
+  const rank = { 'no-show': 0, 'gps-frozen': 1, crowded: 2 };
+  issues.sort((a, b) => rank[a.type] - rank[b.type] || (b.count ?? 0) - (a.count ?? 0) || (a.minAgo ?? 0) - (b.minAgo ?? 0));
+
+  res.json({
+    now: t,
+    windowMin,
+    counts,
+    tracking: {
+      ...summarize(vehicles),
+      byPassengers: vehicles.filter((v) => v.confirmedBy === 'passenger').length,
+    },
+    issues,
+    reports: recent.slice(-40).reverse().map((r) => ({
+      kind: r.kind,
+      stopId: r.stopId,
+      stopName: stopById.get(r.stopId).name,
+      lineId: r.lineId,
+      dir: r.dir,
+      tripId: r.tripId,
+      busNo: vehicleById.get(r.tripId)?.busNo ?? null,
+      minAgo: minAgo(r.at),
+    })),
   });
 });
 

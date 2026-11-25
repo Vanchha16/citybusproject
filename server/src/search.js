@@ -1,4 +1,4 @@
-import { places, stops } from './data/network.js';
+import { places, stops } from './data/dataset.js';
 import { haversine } from './geo.js';
 
 const KHMER = /[ក-៿]/;

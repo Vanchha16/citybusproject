@@ -29,6 +29,14 @@ export const api = {
   arrivals: ({ stopId, lineId, dir }) => request(`/api/arrivals?${qs({ stopId, lineId, dir })}`),
   plan: (from, to) =>
     request(`/api/plan?${qs({ fromLat: from.lat, fromLng: from.lng, toLat: to.lat, toLng: to.lng })}`),
+  /** A passenger's report about the bus at their stop: kind = came | missed | full. */
+  report: ({ kind, stopId, lineId, dir, tripId }) =>
+    request('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, stopId, lineId, dir, tripId }),
+    }),
+  reports: () => request('/api/reports'),
   ask: (message, location) =>
     request('/api/assistant', {
       method: 'POST',

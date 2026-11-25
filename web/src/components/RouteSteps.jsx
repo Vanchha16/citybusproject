@@ -1,6 +1,6 @@
 import LineBadge from './LineBadge.jsx';
 import { JourneyStrip } from './RouteOptions.jsx';
-import { ArrivalTime } from './Realtime.jsx';
+import { ArrivalTime, ReportNote } from './Realtime.jsx';
 import RideToStop from './RideToStop.jsx';
 import { ChevronIcon, PinIcon, WalkIcon } from './icons.jsx';
 import { clock, distance, label, roundMin, t } from '../i18n.js';
@@ -67,12 +67,15 @@ export default function RouteSteps({ option, destination, lineById, stopById, la
                     <span className="text-sm">{s.towards(label(leg.headsign, lang))}</span>
                   </p>
                   {i === firstBusIdx && leg.realtime ? (
-                    <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px]">
-                      <span className="text-ink-soft">{s.nextBus}</span>
-                      <ArrivalTime arrival={leg.realtime} now={now} lang={lang} />
-                      <span className="text-ink-soft">({clock(leg.realtime.at)})</span>
-                      {leg.realtime.delayMin >= 1 && <span className="text-amber-800">{s.late(Math.round(leg.realtime.delayMin))}</span>}
-                    </p>
+                    <>
+                      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px]">
+                        <span className="text-ink-soft">{s.nextBus}</span>
+                        <ArrivalTime arrival={leg.realtime} now={now} lang={lang} />
+                        <span className="text-ink-soft">({clock(leg.realtime.at)})</span>
+                        {leg.realtime.delayMin >= 1 && <span className="text-amber-800">{s.late(Math.round(leg.realtime.delayMin))}</span>}
+                      </p>
+                      <ReportNote arrival={leg.realtime} lang={lang} className="mt-1" />
+                    </>
                   ) : (
                     <p className="mt-1 text-[13px] text-ink-soft">{s.waitFor(Math.round(leg.waitMin))}</p>
                   )}

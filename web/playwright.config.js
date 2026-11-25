@@ -30,7 +30,7 @@ export default defineConfig({
       command: 'node src/index.js',
       cwd: '../server',
       url: `http://localhost:${API_PORT}/api/health`,
-      env: { PORT: String(API_PORT), DEMO_CLOCK: '09:00', ANTHROPIC_API_KEY: '' },
+      env: { PORT: String(API_PORT), DEMO_CLOCK: '09:00', ANTHROPIC_API_KEY: '', CITYBUS_DATA: 'sample' },
       reuseExistingServer: false,
     },
     {

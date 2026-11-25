@@ -22,6 +22,11 @@ const pages = {
   },
   nearby: async (page, s) => nav(page, s, 'nearby').click(),
   settings: async (page, s) => nav(page, s, 'settings').click(),
+  operator: async (page, s) => {
+    await page.goto('/operator');
+    await expect(page.getByRole('heading', { name: s.ops.title })).toBeVisible();
+    await expect(page.getByRole('heading', { name: s.ops.recent })).toBeVisible();
+  },
 };
 
 async function violations(page) {

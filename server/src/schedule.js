@@ -4,13 +4,8 @@
 // The planner and the live map share this model, so the ETAs shown match the
 // buses moving on the map.
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { stops, lines } from './data/network.js';
+import { stops, lines, SHAPES_FILE } from './data/dataset.js';
 import { haversine, polylineLength, pointAlong } from './geo.js';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const SHAPES_FILE = path.join(here, 'data', 'shapes.json');
 
 export const ROAD_FACTOR = 1.3; // straight-line -> street distance when no road shape is known
 export const DWELL_MIN = 0.5;
@@ -19,7 +14,10 @@ const DAY = 24 * 60;
 export const stopById = new Map(stops.map((s) => [s.id, s]));
 export const lineById = new Map(lines.map((l) => [l.id, l]));
 
-/** Road geometry per line: { [lineId]: [[ [lat,lng], ... ] per segment ] } (forward direction). */
+/**
+ * Road geometry per line: { [lineId]: [[ [lat,lng], ... ] per segment ] } (forward direction),
+ * plus { [`${lineId}:back`]: ... } for lines whose way back uses different stops.
+ */
 function loadShapes() {
   try {
     return JSON.parse(fs.readFileSync(SHAPES_FILE, 'utf8'));
@@ -37,22 +35,27 @@ const toMin = (hhmm) => {
 
 /**
  * Pre-computed timing for one direction of a line.
- * dir 0 follows `line.stops` order, dir 1 is the reverse.
+ * dir 0 follows `line.stops` order. dir 1 follows `line.stopsBack` when the way back uses
+ * different stops (one-way streets, from imported GTFS), otherwise it is the reverse.
  */
 function buildPattern(line, dir) {
-  const ids = dir === 0 ? [...line.stops] : [...line.stops].reverse();
-  const fwdSegments = line.stops.slice(1).map((id, i) => {
-    const shaped = shapes[line.id]?.[i];
+  const own = dir === 1 && line.stopsBack;
+  const shapeKey = own ? `${line.id}:back` : line.id;
+  const seq = own ? line.stopsBack : line.stops;
+  const drawn = seq.slice(1).map((id, i) => {
+    const shaped = shapes[shapeKey]?.[i];
     if (shaped && shaped.length >= 2) return shaped;
-    const a = stopById.get(line.stops[i]);
+    const a = stopById.get(seq[i]);
     const b = stopById.get(id);
     return [[a.lat, a.lng], [b.lat, b.lng]];
   });
-  const segments = dir === 0 ? fwdSegments : [...fwdSegments].reverse().map((s) => [...s].reverse());
+  const reversed = dir === 1 && !own;
+  const ids = reversed ? [...seq].reverse() : [...seq];
+  const segments = reversed ? [...drawn].reverse().map((s) => [...s].reverse()) : drawn;
   const mPerMin = (line.speedKmh * 1000) / 60;
   const offsets = [0];
   const segMinutes = segments.map((seg, i) => {
-    const shaped = Boolean(shapes[line.id]);
+    const shaped = Boolean(shapes[shapeKey]);
     const meters = shaped ? polylineLength(seg) : haversine(stopById.get(ids[i]), stopById.get(ids[i + 1])) * ROAD_FACTOR;
     const minutes = meters / mPerMin + DWELL_MIN;
     offsets.push(offsets[i] + minutes);
@@ -218,10 +221,11 @@ export function project(pattern, point) {
   return best;
 }
 
-/** Full geometry of a line (forward direction) for drawing on the map. */
+/** Full geometry of a line for drawing on the map: the way there, and the way back if it differs. */
 export function lineGeometry(lineId) {
-  const segs = patterns[lineId][0].segments;
-  return segs.flatMap((s, i) => (i === 0 ? s : s.slice(1)));
+  const join = (segs) => segs.flatMap((s, i) => (i === 0 ? s : s.slice(1)));
+  const there = join(patterns[lineId][0].segments);
+  return lineById.get(lineId).stopsBack ? [...there, ...join(patterns[lineId][1].segments).slice(1)] : there;
 }
 
 /** Sub-geometry of a ride from index a to index b on a pattern. */

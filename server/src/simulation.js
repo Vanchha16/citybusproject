@@ -6,7 +6,7 @@
 //
 // In production this file is replaced by the operator's real GPS feed; the
 // fusion layer (realtime.js) only sees fixes, exactly like it would there.
-import { lines } from './data/network.js';
+import { lines } from './data/dataset.js';
 import { patterns, positionAt, departuresBetween } from './schedule.js';
 
 const REPORT_EVERY_MIN = 0.25; // a GPS unit reports every 15 s

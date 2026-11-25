@@ -159,6 +159,10 @@ export default function App() {
   const [lineFocusId, setLineFocusId] = useState(null); // a line opened from the Lines tab
   const [atStopId, setAtStopId] = useState(null); // the stop you've walked up to (real position only)
   const [dismissedStopId, setDismissedStopId] = useState(null);
+  const [reported, setReported] = useState({}); // tripId -> kind: one report per bus from this phone
+  const [reportFlash, setReportFlash] = useState(null); // { stopId, kind }: "thanks" for a few seconds
+  const [reportError, setReportError] = useState(false);
+  const [nearbyNonce, setNearbyNonce] = useState(0); // bump to refresh nearby stops now
 
   const [plan, setPlan] = useState(null);
   const [planning, setPlanning] = useState(false);
@@ -309,7 +313,26 @@ export default function App() {
     const id = setInterval(load, atStopId ? 10000 : 20000);
     return () => { current = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originKey, Boolean(atStopId)]);
+  }, [originKey, Boolean(atStopId), nearbyNonce]);
+
+  /** Tell everyone about the bus at this stop: it's here, it didn't come, or it's full. */
+  const sendReport = async (stop, dep, arrival, kind) => {
+    setReportError(false);
+    setReported((r) => ({ ...r, [arrival.tripId]: kind }));
+    try {
+      await api.report({ kind, stopId: stop.stopId, lineId: dep.lineId, dir: dep.dir, tripId: arrival.tripId });
+      setReportFlash({ stopId: stop.stopId, kind });
+      setNearbyNonce((n) => n + 1); // see the effect straight away
+    } catch {
+      setReported(({ [arrival.tripId]: _, ...rest }) => rest);
+      setReportError(true);
+    }
+  };
+  useEffect(() => {
+    if (!reportFlash) return undefined;
+    const id = setTimeout(() => setReportFlash(null), 8000);
+    return () => clearTimeout(id);
+  }, [reportFlash]);
 
   const lineById = useMemo(() => new Map((network?.lines ?? []).map((l) => [l.id, l])), [network]);
   const alert = useBusAlert(lineById, lang);
@@ -346,7 +369,18 @@ export default function App() {
   const yourBus = firstBusLeg && firstBusLeg.from.stopId === atStopId ? { lineId: firstBusLeg.lineId, dir: firstBusLeg.dir } : null;
   // Part of the page (never floating over map controls); scroll up so it's seen on arrival.
   const stopCard = atStop && (
-    <AtStopCard stop={atStop} now={now} lineById={lineById} lang={lang} yourBus={yourBus} onClose={() => setDismissedStopId(atStopId)} />
+    <AtStopCard
+      stop={atStop}
+      now={now}
+      lineById={lineById}
+      lang={lang}
+      yourBus={yourBus}
+      onClose={() => setDismissedStopId(atStopId)}
+      reported={reported}
+      flash={reportFlash}
+      reportError={reportError}
+      onReport={sendReport}
+    />
   );
   useEffect(() => {
     if (atStopId) panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -783,6 +817,7 @@ export default function App() {
               lang={lang}
               setLang={setLang}
               aiEnabled={network?.ai}
+              dataSource={network?.data}
               watch={alert.watch}
               lineById={lineById}
               onStopWatch={alert.stop}

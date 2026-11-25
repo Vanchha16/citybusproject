@@ -14,6 +14,7 @@ export const limits = () => ({
   askPerMinute: num(process.env.ASK_PER_MINUTE, 10),
   aiPerHour: num(process.env.AI_PER_HOUR, 20),
   aiPerDay: num(process.env.AI_PER_DAY, 300),
+  reportsPer10Min: num(process.env.REPORTS_PER_10_MIN, 12),
 });
 
 const MINUTE = 60_000;
@@ -56,6 +57,23 @@ export function createLimiter(clock = () => Date.now()) {
         && aiPerDay.count('all', now) < l.aiPerDay;
       if (useAI) { aiPerHour.add(clientId, now); aiPerDay.add('all', now); }
       return { allowed: true, retryAfterSec: 0, useAI };
+    },
+  };
+}
+
+/** Passenger reports: at most REPORTS_PER_10_MIN per person, so one phone can't fake a ghost bus. */
+export function createReportLimiter(clock = () => Date.now()) {
+  const win = new Window(10 * MINUTE);
+  let lastSweep = clock();
+  return {
+    check(clientId) {
+      const now = clock();
+      if (now - lastSweep > 5 * MINUTE) { win.sweep(now); lastSweep = now; }
+      if (win.count(clientId, now) >= limits().reportsPer10Min) {
+        return { allowed: false, retryAfterSec: Math.ceil(win.retryIn(clientId, now) / 1000) };
+      }
+      win.add(clientId, now);
+      return { allowed: true, retryAfterSec: 0 };
     },
   };
 }

@@ -1,5 +1,5 @@
 import LineBadge from './LineBadge.jsx';
-import { ArrivalTime } from './Realtime.jsx';
+import { ArrivalTime, ReportNote } from './Realtime.jsx';
 import { distance, label, t } from '../i18n.js';
 
 /** The closest stops, when the next buses come, and a bell to get alerted. */
@@ -23,7 +23,7 @@ export default function NearbyStops({ nearby, now, lineById, lang, watch, onWatc
                 const next = d.arrivals[0];
                 const watching = Boolean(watch && watch.stopId === stop.stopId && watch.lineId === d.lineId && watch.dir === d.dir);
                 return (
-                  <li key={`${d.lineId}-${d.dir}`} className="flex items-center gap-2 text-sm">
+                  <li key={`${d.lineId}-${d.dir}`} className="flex flex-wrap items-center gap-x-2 text-sm">
                     <LineBadge line={line} size="sm" />
                     <span className="min-w-0 flex-1 truncate text-ink-soft">{s.towards(label(d.headsign, lang))}</span>
                     <ArrivalTime arrival={next} now={now} lang={lang} className="shrink-0" />
@@ -37,6 +37,7 @@ export default function NearbyStops({ nearby, now, lineById, lang, watch, onWatc
                     >
                       🔔
                     </button>
+                    <ReportNote arrival={next} lang={lang} className="w-full pb-1 pl-9" />
                   </li>
                 );
               })}

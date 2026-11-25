@@ -5,8 +5,9 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/index.js",
     "start": "node --env-file-if-exists=.env src/index.js",
-    "test": "node --test test/",
-    "shapes": "node scripts/fetch-shapes.js"
+    "test": "node --env-file=test/sample.env --test test/",
+    "shapes": "node scripts/fetch-shapes.js",
+    "import:gtfs": "node scripts/import-gtfs.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.13.0",

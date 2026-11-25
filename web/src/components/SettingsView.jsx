@@ -2,7 +2,7 @@ import LineBadge from './LineBadge.jsx';
 import Flag from './Flag.jsx';
 import { label, t } from '../i18n.js';
 
-export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById, onStopWatch, onStartDemo }) {
+export default function SettingsView({ lang, setLang, aiEnabled, dataSource, watch, lineById, onStopWatch, onStartDemo }) {
   const s = t(lang);
   const line = watch ? lineById.get(watch.lineId) : null;
   return (
@@ -64,9 +64,17 @@ export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById
         <p className="text-sm text-ink-soft">{aiEnabled ? s.aiOn : s.aiOff}</p>
       </section>
 
+      <a href="/operator" className="flex items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-line hover:bg-mist">
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">{s.opsLink}</span>
+          <span className="block text-sm text-ink-soft">{s.opsHint}</span>
+        </span>
+        <span aria-hidden className="text-ink-faint">→</span>
+      </a>
+
       <section aria-labelledby="about-h" className="rounded-2xl bg-white p-4 ring-1 ring-line">
         <h2 id="about-h" className="mb-1 font-semibold">{s.about}</h2>
-        <p className="text-sm leading-relaxed text-ink-soft">{s.sample}</p>
+        <p className="text-sm leading-relaxed text-ink-soft">{dataSource?.kind === 'gtfs' ? s.dataFrom(dataSource.name) : s.sample}</p>
       </section>
     </div>
   );

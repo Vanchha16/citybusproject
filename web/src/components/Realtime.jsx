@@ -37,6 +37,20 @@ export function ArrivalTime({ arrival, now, lang, className = '' }) {
   );
 }
 
+/** What other passengers said about this bus: it's full, it didn't come, where it was seen. */
+export function ReportNote({ arrival, lang, className = '' }) {
+  const r = arrival?.reports;
+  if (!r || (!r.full && !r.missed && !r.seen)) return null;
+  const s = t(lang);
+  return (
+    <span className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-xs ${className}`}>
+      {r.full && <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">{s.note.full}</span>}
+      {r.missed > 0 && <span className="rounded-full bg-red-50 px-2 py-0.5 font-semibold text-red-800">{s.note.missed(r.missed)}</span>}
+      {r.seen && <span className="text-ink-soft">{s.note.seen(label(r.seen.stopName, lang), r.seen.minAgo)}</span>}
+    </span>
+  );
+}
+
 /** Map legend: how many buses are live, estimated, or ignored as suspect right now. */
 export function BusLegend({ summary, lang, compact = false }) {
   const s = t(lang);

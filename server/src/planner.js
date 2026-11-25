@@ -1,7 +1,7 @@
 // Trip planner: time-dependent Dijkstra over (stop, on-bus pattern) states.
 // Generalised cost = minutes + extra weight on walking + a penalty per transfer,
 // so it prefers fewer transfers and less walking, as passengers do.
-import { stops, lines } from './data/network.js';
+import { stops, lines } from './data/dataset.js';
 import { haversine } from './geo.js';
 import { stopById, lineById, patterns, boardingsAtStop, nextArrival, rideGeometry } from './schedule.js';
 
@@ -31,7 +31,7 @@ export function linesServing(point, radius = MAX_ACCESS_WALK_M) {
   const best = new Map();
   for (const { stop, meters } of stopsNear(point, radius)) {
     for (const line of lines) {
-      if (!line.stops.includes(stop.id)) continue;
+      if (!line.stops.includes(stop.id) && !line.stopsBack?.includes(stop.id)) continue;
       if (!best.has(line.id) || best.get(line.id).meters > meters) {
         best.set(line.id, { lineId: line.id, stopId: stop.id, meters: Math.round(meters) });
       }
