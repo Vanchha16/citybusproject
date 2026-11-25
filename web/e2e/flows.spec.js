@@ -240,14 +240,25 @@ test.describe('ride to the bus stop', () => {
   // ~400 m from the Central Market stop, so routes start with a walk.
   test.use({ permissions: ['geolocation'], geolocation: { latitude: 11.5712, longitude: 104.9178 } });
 
-  test('the walk to the first stop also offers Grab, PassApp and a street ride', async ({ page }, info) => {
+  test('"Ride instead" opens a popup with Grab, PassApp and a street ride', async ({ page }, info) => {
     const s = await openHome(page);
     await searchDestination(page, s, 'airport', 'Techo International Airport');
     await routeOptions(page).first().click();
-    const ride = page.locator('[data-ride-to-stop]');
-    await expect(ride).toContainText(/Or ride, about \d+ min/);
+    const button = page.locator('[data-ride-to-stop]');
+    await expect(button).toHaveText(/Ride instead · \d+ min/);
+
+    await button.click();
+    const ride = page.getByRole('dialog', { name: s.rideTo('Central Market') });
+    await expect(ride).toBeVisible();
+    await expect(ride).toContainText(/About \d+ min/);
     await expect(ride).toContainText(s.streetRide);
     await expect(ride.getByRole('button', { name: s.openApp('PassApp') })).toBeVisible();
+
+    // Esc closes it; it opens again from the same button.
+    await page.keyboard.press('Escape');
+    await expect(ride).toBeHidden();
+    await button.click();
+    await expect(ride).toBeVisible();
 
     // Opens Grab's official store page (App Store on iPhone, Google Play elsewhere).
     // The stores are intercepted: we check which page was opened without loading it.
@@ -261,6 +272,9 @@ test.describe('ride to the bus stop', () => {
       ? 'https://apps.apple.com/app/id647268330'
       : 'https://play.google.com/store/apps/details?id=com.grabtaxi.passenger';
     await expect.poll(() => opened).toContain(expected);
+
+    await ride.getByRole('button', { name: s.close }).click();
+    await expect(ride).toBeHidden();
   });
 });
 
