@@ -17,7 +17,7 @@ export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById
         <span className="flex size-9 items-center justify-center rounded-full bg-signal text-ink" aria-hidden>▶</span>
         <span>
           <span className="block font-semibold">{s.demo.start}</span>
-          <span className="block text-sm text-white/75">{s.demo.hint}</span>
+          <span className="block text-sm text-white">{s.demo.hint}</span>
         </span>
       </button>
 

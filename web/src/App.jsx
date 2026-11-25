@@ -412,7 +412,8 @@ export default function App() {
     setFocusTarget(null);
     setSheetOpen(false);
     const at = target === 'to' && destination ? destination : origin;
-    requestAnimationFrame(() => mapRef.current?.flyTo([at.lat, at.lng], Math.max(mapRef.current.getZoom(), 16), { duration: 0.5 }));
+    // Jump (no animation): a quick "Set start here" must never pick a point mid-flight.
+    requestAnimationFrame(() => mapRef.current?.setView([at.lat, at.lng], Math.max(mapRef.current.getZoom(), 16), { animate: false }));
   };
   /** Name a chosen point after the nearest known place ("Near Central Market"), if one is close. */
   const pinnedPlace = (p) => {

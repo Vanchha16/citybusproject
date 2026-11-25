@@ -67,6 +67,12 @@ Location works on the deployed site because it is served over HTTPS.
   The live map card is a mini diagram of the network with buses moving in real time.
 - **Bottom bar**: Home, Lines (every line with frequency, hours and stops), a raised **Directions**
   button (the trip planner), Nearby (stops near you with next buses), Settings (language, alerts, about)
+- **Ride to the stop**: under the walk to the first bus stop, "Or ride, about N min" with Open Grab /
+  Open PassApp and "or take a motodop / tuk-tuk nearby". Grab and PassApp publish no documented
+  deep links, so the buttons open their official store pages (which show "Open" when installed)
+  and copy the stop name to paste as the drop-off. Ride time = road distance at 18 km/h
+  (`RIDE_KMH` in `web/src/rides.js`, an assumption).
+- **Choose on map**: set your start (or destination) by moving the map under a fixed pin
 - **Destination search** in Khmer and English (`ផ្សារទួលទំពូង`, `russian market`, `airport`, `AEON 2`…)
 - **"Buses that go to …"**: every line serving the destination, with the map filtered to those lines
 - **Route options** tagged *Recommended / Fastest / Fewest transfers / Least walking*

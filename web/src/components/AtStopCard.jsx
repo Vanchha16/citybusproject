@@ -32,7 +32,7 @@ export default function AtStopCard({ stop, now, lineById, lang, yourBus, onClose
           <span className="sr-only">{s.yourBus}:</span>
           <LineBadge line={lineById.get(mine.lineId)} size="lg" className="ring-2 ring-white/90" />
           <span className="min-w-0 flex-1">
-            <span className="block text-xs text-white/75">{s.yourBus}</span>
+            <span className="block text-xs text-white">{s.yourBus}</span>
             <span className="block truncate text-sm">{s.towards(label(mine.headsign, lang))}</span>
           </span>
           {/* White on the dark box whatever the source (live / estimated / timetable). */}

@@ -1,6 +1,7 @@
 import LineBadge from './LineBadge.jsx';
 import { JourneyStrip } from './RouteOptions.jsx';
 import { ArrivalTime } from './Realtime.jsx';
+import RideToStop from './RideToStop.jsx';
 import { ChevronIcon, PinIcon, WalkIcon } from './icons.jsx';
 import { clock, distance, label, roundMin, t } from '../i18n.js';
 
@@ -32,13 +33,17 @@ export default function RouteSteps({ option, destination, lineById, stopById, la
                 <span className="flex justify-center">
                   <span className="w-0 border-l-[3px] border-dotted border-walk" />
                 </span>
-                <p className="flex items-center gap-2 py-3 text-sm text-ink-soft">
-                  <WalkIcon />
-                  <span>
-                    {s.walk(distance(leg.meters, lang), roundMin(leg.minutes))}
-                    <span className="block text-ink">{target}</span>
-                  </span>
-                </p>
+                <div className="py-3">
+                  <p className="flex items-center gap-2 text-sm text-ink-soft">
+                    <WalkIcon />
+                    <span>
+                      {s.walk(distance(leg.meters, lang), roundMin(leg.minutes))}
+                      <span className="block text-ink">{target}</span>
+                    </span>
+                  </p>
+                  {/* The walk to the first bus stop can also be a ride (shown on every route). */}
+                  {i === 0 && leg.to.stopId && <RideToStop leg={leg} lang={lang} />}
+                </div>
               </li>
             );
           }

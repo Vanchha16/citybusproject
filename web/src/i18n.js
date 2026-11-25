@@ -124,6 +124,10 @@ const strings = {
     cancel: 'Cancel',
     nearPlace: (p) => 'Near ' + p,
     pinned: 'Chosen on map',
+    orRide: (min) => 'Or ride, about ' + min + ' min',
+    openApp: (name) => 'Open ' + name,
+    streetRide: 'or take a motodop / tuk-tuk nearby',
+    stopCopied: 'Stop name copied. Paste it as your drop-off.',
     demo: {
       start: 'Start demo',
       hint: 'Guided tour, about 1 minute',
@@ -269,6 +273,10 @@ const strings = {
     cancel: 'បោះបង់',
     nearPlace: (p) => 'ជិត ' + p,
     pinned: 'ទីតាំងជ្រើសលើផែនទី',
+    orRide: (min) => 'ឬជិះ ប្រហែល ' + kmNum(min) + ' នាទី',
+    openApp: (name) => 'បើក ' + name,
+    streetRide: 'ឬជិះម៉ូតូឌុប / រ៉ឺម៉កនៅក្បែរ',
+    stopCopied: 'បានចម្លងឈ្មោះចំណត។ សូមបិទភ្ជាប់ជាគោលដៅ។',
     demo: {
       start: 'ចាប់ផ្តើមបង្ហាញ',
       hint: 'ការណែនាំប្រហែល ១ នាទី',

@@ -12,7 +12,7 @@ export default function LinesToHere({ destination, servingLines, lineById, onlyS
     <section aria-labelledby="lines-h" className="rise rounded-xl bg-brand px-4 py-3.5 text-white" style={{ '--d': '80ms' }}>
       <h2 id="lines-h" className="text-[15px] font-semibold">{s.linesHere(placeName)}</h2>
       {servingLines.length === 0 ? (
-        <p className="mt-1 text-sm text-white/75">{s.noLinesHere}</p>
+        <p className="mt-1 text-sm text-white">{s.noLinesHere}</p>
       ) : (
         <>
           {/* Just the badges: line names live in the Lines tab and in each badge's tooltip. */}
@@ -29,7 +29,7 @@ export default function LinesToHere({ destination, servingLines, lineById, onlyS
               );
             })}
           </ul>
-          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-white/85">
+          <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-white">
             <input type="checkbox" checked={onlyServing} onChange={(e) => onToggle(e.target.checked)} className="size-4 accent-signal" />
             {s.onlyTheseLines}
           </label>
