@@ -9,7 +9,7 @@ export default function LinesToHere({ destination, servingLines, lineById, onlyS
   const s = t(lang);
   const placeName = label(destination.name, lang);
   return (
-    <section aria-labelledby="lines-h" className="rise rounded-xl bg-ink px-4 py-3.5 text-white" style={{ '--d': '80ms' }}>
+    <section aria-labelledby="lines-h" className="rise rounded-xl bg-brand px-4 py-3.5 text-white" style={{ '--d': '80ms' }}>
       <h2 id="lines-h" className="text-[15px] font-semibold">{s.linesHere(placeName)}</h2>
       {servingLines.length === 0 ? (
         <p className="mt-1 text-sm text-white/75">{s.noLinesHere}</p>

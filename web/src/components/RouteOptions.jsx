@@ -52,7 +52,7 @@ export default function RouteOptions({ plan, lineById, lang, onSelect }) {
                   {opt.walkMeters >= 300 && <span>{s.walkTotal(distance(opt.walkMeters, lang))}</span>}
                   {/* One tag is enough: the most useful thing about this option. */}
                   {opt.tags?.[0] && (
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${opt.tags[0] === 'recommended' ? 'bg-ink text-white' : 'bg-mist text-ink-soft'}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${opt.tags[0] === 'recommended' ? 'bg-brand text-white' : 'bg-mist text-ink-soft'}`}>
                       {s.tag[opt.tags[0]]}
                     </span>
                   )}

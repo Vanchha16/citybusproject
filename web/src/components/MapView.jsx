@@ -77,6 +77,19 @@ function FollowCamera({ follow, paused, position, onUserPan }) {
   return null;
 }
 
+/** Hands the Leaflet map to the app, and in pick mode a tap moves that spot under the centre pin. */
+function MapBridge({ onReady, pickMode }) {
+  const map = useMap();
+  useEffect(() => { onReady?.(map); }, [map, onReady]);
+  useEffect(() => {
+    if (!pickMode) return undefined;
+    const onClick = (e) => map.panTo(e.latlng, { animate: true });
+    map.on('click', onClick);
+    return () => map.off('click', onClick);
+  }, [map, pickMode]);
+  return null;
+}
+
 function FitView({ bounds, padding, fitKey }) {
   const map = useMap();
   const key = fitKey ?? JSON.stringify(bounds);
@@ -92,7 +105,7 @@ function FitView({ bounds, padding, fitKey }) {
 
 export default function MapView({
   network, buses, origin, destination, focusLineIds, lineFocusId, option, lang, fitPadding,
-  follow = false, followPaused = false, onUserPan, accuracyM = null,
+  follow = false, followPaused = false, onUserPan, accuracyM = null, onReady, pickMode = false,
 }) {
   const s = t(lang);
   const lineById = useMemo(() => new Map(network.lines.map((l) => [l.id, l])), [network]);
@@ -232,7 +245,8 @@ export default function MapView({
         <Marker key={revealKey} position={[destination.lat, destination.lng]} icon={destIcon} zIndexOffset={1000} keyboard={false} />
       )}
 
-      <FitView bounds={bounds} padding={fitPadding} fitKey={fitKey} />
+      <MapBridge onReady={onReady} pickMode={pickMode} />
+      {!pickMode && <FitView bounds={bounds} padding={fitPadding} fitKey={fitKey} />}
       <FollowCamera follow={follow} paused={followPaused} position={origin ? [origin.lat, origin.lng] : null} onUserPan={onUserPan} />
     </MapContainer>
   );

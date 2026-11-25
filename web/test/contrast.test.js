@@ -45,6 +45,13 @@ test('text colours pass on white and on the grey background', () => {
   assert.ok(contrast(INK, token('signal')) >= 4.5, 'alert banner text on yellow');
 });
 
+test('white text on the brand blues (header, buttons, Directions) is readable', () => {
+  for (const name of ['brand-light', 'brand', 'brand-dark']) {
+    const r = contrast(WHITE, token(name));
+    assert.ok(r >= 4.5, `white on ${name} ${token(name)}: ${r.toFixed(2)}:1`);
+  }
+});
+
 test('status marks are visible (non-text, 3:1)', () => {
   assert.ok(contrast('#16a34a', WHITE) >= 3, 'live dot');
   assert.ok(contrast('#dc2626', WHITE) >= 3, 'live map rec dot');

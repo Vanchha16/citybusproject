@@ -28,7 +28,7 @@ export default function AtStopCard({ stop, now, lineById, lang, yourBus, onClose
       </div>
 
       {mine && (
-        <div className="mb-2 flex items-center gap-3 rounded-xl bg-ink px-3 py-2.5 text-white" data-your-bus="">
+        <div className="mb-2 flex items-center gap-3 rounded-xl bg-brand px-3 py-2.5 text-white" data-your-bus="">
           <span className="sr-only">{s.yourBus}:</span>
           <LineBadge line={lineById.get(mine.lineId)} size="lg" className="ring-2 ring-white/90" />
           <span className="min-w-0 flex-1">

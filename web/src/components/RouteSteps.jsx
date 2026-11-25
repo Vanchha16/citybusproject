@@ -89,7 +89,7 @@ export default function RouteSteps({ option, destination, lineById, stopById, la
                         type="button"
                         onClick={() => onWatch(target)}
                         aria-pressed={active}
-                        className={`mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${active ? 'bg-signal text-ink' : 'bg-ink text-white hover:bg-ink/90'}`}
+                        className={`mt-2 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${active ? 'bg-signal text-ink' : 'bg-brand text-white hover:bg-brand-dark'}`}
                       >
                         <span aria-hidden>🔔</span>
                         {active ? s.alertOn : s.notifyWhenNear}

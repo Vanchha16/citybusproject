@@ -27,7 +27,7 @@ export default function BottomNav({ view, lang, onNavigate }) {
                   aria-current={active ? 'page' : undefined}
                   className="flex flex-col items-center gap-1"
                 >
-                  <span className="flex h-10 w-14 items-center justify-center rounded-2xl bg-ink text-white shadow-md">{it.icon}</span>
+                  <span className="flex h-10 w-14 items-center justify-center rounded-2xl bg-brand text-white shadow-md">{it.icon}</span>
                   <span className="text-[11px] font-semibold leading-tight">{text}</span>
                 </button>
               </li>
@@ -41,7 +41,7 @@ export default function BottomNav({ view, lang, onNavigate }) {
                 aria-current={active ? 'page' : undefined}
                 className={`flex w-full flex-col items-center gap-1 rounded-xl py-1 ${active ? 'text-ink' : 'text-ink-faint hover:text-ink-soft'}`}
               >
-                <span className={`flex h-8 w-11 items-center justify-center rounded-xl ${active ? 'bg-ink text-white' : ''}`}>{it.icon}</span>
+                <span className={`flex h-8 w-11 items-center justify-center rounded-xl ${active ? 'bg-brand text-white' : ''}`}>{it.icon}</span>
                 <span className={`text-[11px] leading-tight ${active ? 'font-semibold' : ''}`}>{text}</span>
               </button>
             </li>

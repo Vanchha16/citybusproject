@@ -236,6 +236,57 @@ test.describe('follow me while walking', () => {
   });
 });
 
+test.describe('choose your location on the map', () => {
+  test('From → Choose on map → Set start here names the spot after the nearest place', async ({ page }) => {
+    const s = await openHome(page);
+    await page.getByRole('button', { name: s.whereTo }).click();
+    const from = page.getByPlaceholder(s.from);
+    await from.click();
+    await page.locator('#' + (await from.getAttribute('aria-controls'))).getByRole('option', { name: s.chooseOnMap }).click();
+    const picker = page.getByRole('dialog', { name: s.chooseOnMap });
+    await expect(picker).toContainText(s.pickStart);
+    await picker.getByRole('button', { name: s.setStartHere }).click();
+    await expect(picker).toHaveCount(0);
+    await expect(from).toHaveValue(/^Near /); // e.g. "Near Central Market (Phsar Thmei)"
+  });
+
+  test('To → tap a spot on the map → Go here plans a route there', async ({ page }) => {
+    const s = await openHome(page);
+    await page.getByRole('button', { name: s.whereTo }).click();
+    const to = page.getByPlaceholder(s.whereTo);
+    await to.click();
+    await page.locator('#' + (await to.getAttribute('aria-controls'))).getByRole('option', { name: s.chooseOnMap }).click();
+    const picker = page.getByRole('dialog', { name: s.chooseOnMap });
+    await expect(picker).toContainText(s.pickDest);
+    const map = await page.locator('.leaflet-container').boundingBox();
+    await page.mouse.click(map.x + map.width * 0.7, map.y + map.height * 0.3); // tap: that spot slides under the pin
+    await page.waitForTimeout(600);
+    await picker.getByRole('button', { name: s.goHere }).click();
+    await expect(page.getByRole('heading', { name: /^Buses that go to (Near |Chosen on map)/ })).toBeVisible();
+  });
+
+  test('Cancel keeps the start as it was', async ({ page }) => {
+    const s = await openHome(page);
+    await page.getByRole('button', { name: s.whereTo }).click();
+    const from = page.getByPlaceholder(s.from);
+    const before = await from.inputValue();
+    await from.click();
+    await page.locator('#' + (await from.getAttribute('aria-controls'))).getByRole('option', { name: s.chooseOnMap }).click();
+    await page.getByRole('dialog', { name: s.chooseOnMap }).getByRole('button', { name: s.cancel }).click();
+    await expect(from).toHaveValue(before);
+  });
+
+  test('Nearby page pin button sets where you are, and the stop list follows', async ({ page }) => {
+    const s = await openHome(page);
+    await nav(page, s, 'nearby').click();
+    await page.locator('aside').getByRole('button', { name: s.chooseOnMap }).click();
+    const picker = page.getByRole('dialog', { name: s.chooseOnMap });
+    await picker.getByRole('button', { name: s.setStartHere }).click();
+    await expect(picker).toHaveCount(0);
+    await expect(page.locator('main, aside').getByText(/^Near /).first()).toBeAttached();
+  });
+});
+
 test.describe('arriving at a bus stop', () => {
   // ~150 m from the Central Market stop.
   test.use({ permissions: ['geolocation'], geolocation: { latitude: 11.5708, longitude: 104.9200 } });

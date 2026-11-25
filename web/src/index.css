@@ -3,12 +3,16 @@
 
 @theme {
   --font-sans: "Kantumruy Pro", system-ui, sans-serif;
-  --color-ink: #15233f;
+  /* Brand: the blue of the City Bus logo. White text on all three passes WCAG AA. */
+  --color-brand-light: #146be3;
+  --color-brand: #0a62e6;
+  --color-brand-dark: #0847b0;
+  --color-ink: #0f2650;
   --color-ink-soft: #4a5873;
   --color-ink-faint: #5f6b80;
   --color-paper: #ffffff;
-  --color-mist: #eef1f5;
-  --color-line: #dde2ea;
+  --color-mist: #edf2f9;
+  --color-line: #dbe3ee;
   --color-signal: #ffc629;
   --color-walk: #5b6b8a;
 }

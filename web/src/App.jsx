@@ -61,7 +61,7 @@ function useBusAlert(lineById, lang) {
           const body = s.alertBody(Math.max(1, Math.round(next.at - r.now)), label(watch.stopName, lang));
           try {
             if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification(s.alertTitle(code), { body, tag: 'citybus-alert', icon: '/bus.svg' });
+              new Notification(s.alertTitle(code), { body, tag: 'citybus-alert', icon: '/logo.svg' });
             }
           } catch { /* some mobile browsers only allow notifications from a service worker */ }
           navigator.vibrate?.([250, 120, 250]);
@@ -399,6 +399,54 @@ export default function App() {
     setSheetOpen(false);
   };
 
+  // ---- Choose on map: a fixed pin in the middle of the map; move the map under it ----
+  const mapRef = useRef(null);
+  const onMapReady = useCallback((map) => { mapRef.current = map; }, []);
+  const [pickTarget, setPickTarget] = useState(null); // 'from' | 'to' | null
+  const pickReturnView = useRef('trip');
+  const startPick = (target) => {
+    setFollowing(false);
+    pickReturnView.current = view; // e.g. Nearby: go back there after choosing
+    setPickTarget(target);
+    setView('trip');
+    setFocusTarget(null);
+    setSheetOpen(false);
+    const at = target === 'to' && destination ? destination : origin;
+    requestAnimationFrame(() => mapRef.current?.flyTo([at.lat, at.lng], Math.max(mapRef.current.getZoom(), 16), { duration: 0.5 }));
+  };
+  /** Name a chosen point after the nearest known place ("Near Central Market"), if one is close. */
+  const pinnedPlace = (p) => {
+    let best = null;
+    for (const place of network?.places ?? []) {
+      const m = kmBetween(p, place) * 1000;
+      if (m <= 500 && (!best || m < best.m)) best = { place, m };
+    }
+    const en = t('en');
+    const km = t('km');
+    return {
+      id: `pin:${p.lat.toFixed(5)},${p.lng.toFixed(5)}`,
+      type: 'pin',
+      lat: p.lat,
+      lng: p.lng,
+      name: best
+        ? { en: en.nearPlace(best.place.name.en), km: km.nearPlace(best.place.name.km) }
+        : { en: en.pinned, km: km.pinned },
+    };
+  };
+  const endPick = () => {
+    setPickTarget(null);
+    setView(pickReturnView.current);
+  };
+  const confirmPick = () => {
+    const c = mapRef.current?.getCenter();
+    if (c) {
+      const place = pinnedPlace({ lat: c.lat, lng: c.lng });
+      if (pickTarget === 'from') setOriginPlace(place);
+      else { chooseDestination(place); pickReturnView.current = 'trip'; }
+    }
+    endPick();
+  };
+
   const ask = async (question) => {
     setAsking(true);
     try {
@@ -496,7 +544,9 @@ export default function App() {
 
   const asideClass = isDesktop
     ? 'flex h-full min-h-0 flex-col overflow-hidden bg-mist' // panel scrolls inside; never pushes the bottom bar off-screen
-    : fullPage
+    : pickTarget
+      ? 'hidden' // choosing on the map: the whole phone screen is map
+      : fullPage
       ? 'fixed inset-0 z-[1100] flex flex-col bg-mist'
       : 'fixed inset-x-0 bottom-0 z-[1100] flex flex-col rounded-t-2xl bg-white shadow-[0_-4px_24px_rgb(21_35_63/0.15)] transition-[height] duration-300';
 
@@ -524,7 +574,7 @@ export default function App() {
           {s.backHome}
         </button>
         <h1 className="ml-auto flex items-center gap-2 text-base font-bold">
-          <img src="/bus.svg" alt="" className="size-6" />
+          <img src="/logo.svg" alt="" className="size-6" />
           {s.nav.directions}
         </h1>
       </header>
@@ -547,6 +597,7 @@ export default function App() {
             marker={<span className="size-3 rounded-full border-[3px] border-blue-600 bg-white" />}
             myLocationOption
             onMyLocation={locate}
+            onPickOnMap={() => startPick('from')}
           />
           <PlaceSearch
             key={focusTarget === 'to' ? 'to-focus' : 'to'}
@@ -555,6 +606,7 @@ export default function App() {
             placeholder={s.whereTo}
             onSelect={chooseDestination}
             onClear={reset}
+            onPickOnMap={() => startPick('to')}
             near={here}
             lang={lang}
             marker={<PinIcon className="size-5 text-ink" />}
@@ -591,7 +643,7 @@ export default function App() {
                     key={p.id}
                     type="button"
                     onClick={() => chooseDestination(p)}
-                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${p.category === 'airport' ? 'border-ink bg-ink text-white' : 'border-line hover:bg-mist'}`}
+                    className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium ${p.category === 'airport' ? 'border-brand bg-brand text-white' : 'border-line hover:bg-mist'}`}
                   >
                     {p.category === 'airport' && <PlaneIcon className="size-3.5" />}
                     {label(p.name, lang)}
@@ -664,6 +716,15 @@ export default function App() {
         </span>
         <button
           type="button"
+          onClick={() => startPick('from')}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-ink ring-1 ring-line hover:bg-mist"
+          aria-label={s.chooseOnMap}
+          title={s.chooseOnMap}
+        >
+          <PinIcon />
+        </button>
+        <button
+          type="button"
           onClick={toggleFollow}
           aria-pressed={following}
           className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold ${following ? 'bg-blue-600 text-white' : 'text-blue-700 ring-1 ring-blue-200 hover:bg-blue-50'}`}
@@ -733,7 +794,7 @@ export default function App() {
       </aside>
 
       <main className="fixed inset-0 md:relative md:h-full">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[1050] flex flex-col items-center gap-2 p-3">
+        <div className={`pointer-events-none absolute inset-x-0 top-0 z-[1050] flex flex-col items-center gap-2 p-3 ${pickTarget ? 'hidden' : ''}`}>
           {alert.watch && (
             <AlertBanner
               watch={alert.watch}
@@ -747,11 +808,11 @@ export default function App() {
           )}
           <div className="self-end md:hidden"><BusLegend summary={summary} lang={lang} compact /></div>
         </div>
-        <div className="pointer-events-none absolute bottom-6 left-3 z-[1050] hidden md:block">
+        <div className={`pointer-events-none absolute bottom-6 left-3 z-[1050] ${pickTarget ? 'hidden' : 'hidden md:block'}`}>
           <BusLegend summary={summary} lang={lang} />
         </div>
         {/* Follow me: top-left on phones (the sheet covers the bottom), bottom-right on desktop. */}
-        <div className="absolute left-3 top-3 z-[1050] flex items-center gap-2 md:bottom-6 md:left-auto md:right-3 md:top-auto md:flex-row-reverse">
+        <div className={`absolute left-3 top-3 z-[1050] flex items-center gap-2 md:bottom-6 md:left-auto md:right-3 md:top-auto md:flex-row-reverse ${pickTarget ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={toggleFollow}
@@ -773,6 +834,28 @@ export default function App() {
             </span>
           )}
         </div>
+        {pickTarget && (
+          <>
+            {/* The pin stays in the middle; the passenger moves the map under it (or taps a spot). */}
+            <div className="pointer-events-none absolute inset-0 z-[1060] flex items-center justify-center" aria-hidden>
+              <svg width="36" height="48" viewBox="0 0 30 40" className="-translate-y-1/2 drop-shadow-md">
+                <path d="M15 1C7.3 1 1 7.2 1 14.8 1 25 15 39 15 39s14-14 14-24.2C29 7.2 22.7 1 15 1z" fill={pickTarget === 'from' ? '#2563eb' : '#FFC629'} stroke="#15233F" strokeWidth="2" />
+                <circle cx="15" cy="14.5" r="5" fill="#fff" />
+              </svg>
+            </div>
+            <div className="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[1070] mx-auto max-w-md rounded-2xl bg-white p-3 shadow-xl ring-1 ring-line" role="dialog" aria-label={s.chooseOnMap}>
+              <p className="mb-2.5 px-1 font-semibold">{pickTarget === 'from' ? s.pickStart : s.pickDest}</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={endPick} className="flex-1 rounded-xl px-3 py-2.5 font-semibold text-ink-soft ring-1 ring-line hover:bg-mist">
+                  {s.cancel}
+                </button>
+                <button type="button" onClick={confirmPick} className="flex-[2] rounded-xl bg-brand px-3 py-2.5 font-semibold text-white hover:bg-brand-dark">
+                  {pickTarget === 'from' ? s.setStartHere : s.goHere}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
         {network && (
           <MapView
             network={network}
@@ -788,6 +871,8 @@ export default function App() {
             followPaused={followPaused}
             onUserPan={onUserPan}
             accuracyM={originPlace ? null : accuracyM}
+            onReady={onMapReady}
+            pickMode={Boolean(pickTarget)}
           />
         )}
       </main>

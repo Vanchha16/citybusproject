@@ -22,7 +22,7 @@ export default function AskBox({ lang, aiEnabled, onAsk, loading, answer, autoFo
         <SparkIcon />
         {s.askShort}
       </h2>
-      <form onSubmit={submit} className="flex items-center gap-2 rounded-xl border border-line bg-white p-1.5 pl-3 focus-within:ring-2 focus-within:ring-ink">
+      <form onSubmit={submit} className="flex items-center gap-2 rounded-xl border border-line bg-white p-1.5 pl-3 focus-within:ring-2 focus-within:ring-brand">
         <input
           ref={inputRef}
           value={text}
@@ -35,7 +35,7 @@ export default function AskBox({ lang, aiEnabled, onAsk, loading, answer, autoFo
         <button
           type="submit"
           disabled={loading || !text.trim()}
-          className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
         >
           <SendIcon className="size-4" />
           {s.send}

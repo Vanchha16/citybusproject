@@ -51,7 +51,7 @@ export default function LiveMapPreview({ network, buses, origin, lang, onOpen })
           })}
           {me && <circle cx={me[0]} cy={me[1]} r="2.2" fill="#2563eb" stroke="#fff" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
         </svg>
-        <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-ink py-2 pl-4 pr-3 text-sm font-semibold text-white shadow-md">
+        <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-brand py-2 pl-4 pr-3 text-sm font-semibold text-white shadow-md">
           {s.openMap}
           <ChevronIcon className="size-4" />
         </span>

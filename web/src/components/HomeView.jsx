@@ -20,10 +20,10 @@ export default function HomeView({
   return (
     <div className="pb-6">
       {/* Header band */}
-      <header className="rounded-b-[28px] bg-ink px-4 pb-14 pt-4 text-white">
+      <header className="rounded-b-[28px] bg-gradient-to-br from-brand-light via-brand to-brand-dark px-4 pb-14 pt-4 text-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src="/bus.svg" alt="" className="size-10 rounded-xl ring-2 ring-white/20" />
+            <img src="/logo.svg" alt="" className="size-10 rounded-xl ring-2 ring-white/20" />
             <h1 className="text-lg font-bold leading-tight">{s.appName}</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -38,7 +38,7 @@ export default function HomeView({
             </button>
             <button type="button" onClick={onBell} className="relative rounded-full bg-white/10 p-2 hover:bg-white/20" aria-label={s.alertsTitle}>
               <BellIcon />
-              {watch && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-signal ring-2 ring-ink" />}
+              {watch && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-signal ring-2 ring-brand-dark" />}
             </button>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function HomeView({
             type="button"
             onClick={() => onPick(p)}
             className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-medium shadow-sm ring-1 ${
-              p.category === 'airport' ? 'bg-ink text-white ring-ink' : 'bg-white ring-line hover:bg-mist'
+              p.category === 'airport' ? 'bg-brand text-white ring-brand' : 'bg-white ring-line hover:bg-mist'
             }`}
           >
             {p.category === 'airport' && <PlaneIcon className="size-3.5" />}
@@ -103,7 +103,7 @@ export default function HomeView({
                 type="button"
                 onClick={tile.onClick}
                 className={`flex min-w-0 flex-col items-center gap-2 rounded-2xl px-1.5 pb-3 pt-4 text-center shadow-sm ring-1 ${
-                  tile.strong ? 'bg-ink text-white ring-ink' : 'bg-white ring-line hover:bg-mist'
+                  tile.strong ? 'bg-brand text-white ring-brand' : 'bg-white ring-line hover:bg-mist'
                 }`}
               >
                 <span className={`flex size-11 items-center justify-center rounded-full ${tile.strong ? 'bg-white/15' : 'bg-mist'}`}>{tile.icon}</span>

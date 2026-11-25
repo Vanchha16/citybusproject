@@ -12,7 +12,7 @@ export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById
       <button
         type="button"
         onClick={onStartDemo}
-        className="flex w-full items-center gap-3 rounded-2xl bg-ink px-4 py-3.5 text-left text-white shadow-sm hover:bg-ink/90"
+        className="flex w-full items-center gap-3 rounded-2xl bg-brand px-4 py-3.5 text-left text-white shadow-sm hover:bg-brand-dark"
       >
         <span className="flex size-9 items-center justify-center rounded-full bg-signal text-ink" aria-hidden>▶</span>
         <span>
@@ -35,7 +35,7 @@ export default function SettingsView({ lang, setLang, aiEnabled, watch, lineById
               aria-checked={lang === o.code}
               onClick={() => setLang(o.code)}
               lang={o.code}
-              className={`flex items-center justify-center gap-2.5 rounded-lg py-2.5 font-semibold ${lang === o.code ? 'bg-ink text-white' : 'text-ink-soft hover:bg-mist'}`}
+              className={`flex items-center justify-center gap-2.5 rounded-lg py-2.5 font-semibold ${lang === o.code ? 'bg-brand text-white' : 'text-ink-soft hover:bg-mist'}`}
             >
               <Flag code={o.code} className="h-[18px] w-7" />
               {o.text}

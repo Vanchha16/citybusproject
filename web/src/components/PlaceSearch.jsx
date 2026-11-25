@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { label, t } from '../i18n.js';
-import { CloseIcon, LocateIcon, PlaneIcon } from './icons.jsx';
+import { CloseIcon, LocateIcon, PinIcon, PlaneIcon } from './icons.jsx';
 
 // Plain symbols that render the same everywhere; the airport uses the SVG icon (iOS turns ✈ into a colour emoji).
 const CATEGORY_GLYPH = {
@@ -12,12 +12,13 @@ const CATEGORY_GLYPH = {
  * Text field with autocomplete over places and stops (English + Khmer).
  * Shows the chosen place's name when not editing.
  */
-export default function PlaceSearch({ fieldLabel, value, valueText, placeholder, onSelect, onClear, near, lang, marker, myLocationOption, onMyLocation, autoFocus }) {
+export default function PlaceSearch({ fieldLabel, value, valueText, placeholder, onSelect, onClear, near, lang, marker, myLocationOption, onMyLocation, onPickOnMap, autoFocus }) {
   const s = t(lang);
   const id = useId();
   const [editing, setEditing] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [resultsFor, setResultsFor] = useState(''); // the query `results` belong to
   const [active, setActive] = useState(0);
   const inputRef = useRef(null);
 
@@ -36,6 +37,7 @@ export default function PlaceSearch({ fieldLabel, value, valueText, placeholder,
       api.search(query, near).then((r) => {
         if (!cancelled) {
           setResults(r);
+          setResultsFor(query);
           setActive(0);
         }
       }).catch(() => {});
@@ -46,7 +48,16 @@ export default function PlaceSearch({ fieldLabel, value, valueText, placeholder,
     };
   }, [query, editing, near]);
 
-  const options = [...(myLocationOption && editing ? [{ id: '__me', myLocation: true }] : []), ...results];
+  // "My location" / "Choose on map" come first when the box is empty; while typing,
+  // search results come first (so Enter picks the best match) and these follow.
+  const extras = editing
+    ? [
+        ...(myLocationOption ? [{ id: '__me', myLocation: true }] : []),
+        ...(onPickOnMap ? [{ id: '__map', pickOnMap: true }] : []),
+      ]
+    : [];
+  // While a search is still loading, show nothing (so a fast Enter can't pick "Choose on map").
+  const options = query.trim() ? (resultsFor === query ? [...results, ...extras] : []) : extras;
 
   const choose = (item) => {
     setEditing(false);
@@ -54,6 +65,7 @@ export default function PlaceSearch({ fieldLabel, value, valueText, placeholder,
     setResults([]);
     inputRef.current?.blur();
     if (item.myLocation) onMyLocation?.();
+    else if (item.pickOnMap) onPickOnMap?.();
     else onSelect(item);
   };
 
@@ -78,7 +90,7 @@ export default function PlaceSearch({ fieldLabel, value, valueText, placeholder,
 
   return (
     <div className="relative">
-      <label htmlFor={id} className="flex items-center gap-3 rounded-xl bg-mist px-3 py-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-ink">
+      <label htmlFor={id} className="flex items-center gap-3 rounded-xl bg-mist px-3 py-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand">
         <span className="flex w-5 justify-center">{marker}</span>
         <span className="sr-only">{fieldLabel}</span>
         <input
@@ -125,6 +137,11 @@ export default function PlaceSearch({ fieldLabel, value, valueText, placeholder,
                 <>
                   <span className="flex w-5 justify-center text-blue-600"><LocateIcon /></span>
                   <span className="font-medium">{s.myLocation}</span>
+                </>
+              ) : item.pickOnMap ? (
+                <>
+                  <span className="flex w-5 justify-center text-ink"><PinIcon /></span>
+                  <span className="font-medium">{s.chooseOnMap}</span>
                 </>
               ) : (
                 <>

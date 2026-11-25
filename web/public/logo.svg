@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="City Bus">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e9bff"/>
+      <stop offset="1" stop-color="#0a52e0"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3a86f5"/>
+      <stop offset="1" stop-color="#0b3fb8"/>
+    </linearGradient>
+  </defs>
+  <!-- Tile -->
+  <rect width="128" height="128" rx="30" fill="url(#sky)"/>
+  <!-- Clouds -->
+  <path d="M16 30h31a7.5 7.5 0 0 0-11-8.5 9.5 9.5 0 0 0-17 2.6A5.5 5.5 0 0 0 16 30z" fill="#fff" opacity=".92"/>
+  <path d="M83 37h28a6.5 6.5 0 0 0-10-6.6 8 8 0 0 0-14.5 2.3A4.7 4.7 0 0 0 83 37z" fill="#fff" opacity=".88"/>
+  <!-- City skyline -->
+  <path d="M6 70V54h9v-6h7v22h5V43l11-4v31h52V46h11v9h6v-5h7v20z" fill="#5cc0ff" opacity=".45"/>
+  <!-- Road -->
+  <path d="M10 124c20-15 58-21 90-25 9-1 11-7 5-9.5-5-2-13-2.6-22-2.6" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <path d="M40 116l9-2.6M60 110.5l9-2M80 106.5l8-1.4" stroke="#0a52e0" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+  <!-- Bus (front) -->
+  <rect x="28" y="54" width="4.5" height="11" rx="2.2" fill="#fff"/>
+  <rect x="85.5" y="54" width="4.5" height="11" rx="2.2" fill="#fff"/>
+  <rect x="33" y="42" width="52" height="50" rx="11" fill="#fff"/>
+  <rect x="38.5" y="46.5" width="41" height="8" rx="3.5" fill="#0b3fb8"/>
+  <rect x="47" y="48.5" width="24" height="4" rx="2" fill="#fff"/>
+  <rect x="38.5" y="57" width="41" height="20" rx="4.5" fill="url(#glass)"/>
+  <path d="M50 77l10-20h5L55 77zM61 77l10-20h3.5L64.5 77z" fill="#fff" opacity=".22"/>
+  <rect x="40" y="81" width="11" height="5" rx="2.5" fill="none" stroke="#0b3fb8" stroke-width="1.8"/>
+  <rect x="67" y="81" width="11" height="5" rx="2.5" fill="none" stroke="#0b3fb8" stroke-width="1.8"/>
+  <rect x="37" y="90" width="10" height="9" rx="3" fill="#0a2f86"/>
+  <rect x="71" y="90" width="10" height="9" rx="3" fill="#0a2f86"/>
+  <!-- Location pin -->
+  <path d="M100 60a11 11 0 0 1 11 11c0 8.6-11 20-11 20s-11-11.4-11-20a11 11 0 0 1 11-11z" fill="#fff"/>
+  <circle cx="100" cy="71" r="4.6" fill="#0a62e6"/>
+</svg>
