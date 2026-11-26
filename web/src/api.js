@@ -37,6 +37,8 @@ export const api = {
       body: JSON.stringify({ kind, stopId, lineId, dir, tripId }),
     }),
   reports: () => request('/api/reports'),
+  /** A walk along real streets: { source: 'streets' | 'straight', geometry }. */
+  walkPath: (from, to) => request(`/api/walk-path?${qs({ fromLat: from.lat, fromLng: from.lng, toLat: to.lat, toLng: to.lng })}`),
   ask: (message, location) =>
     request('/api/assistant', {
       method: 'POST',

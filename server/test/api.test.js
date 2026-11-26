@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 process.env.DEMO_CLOCK = '09:00'; // buses in service, whatever time the tests run
 process.env.ANTHROPIC_API_KEY = ''; // keyword engine: deterministic answers
+process.env.WALK_ROUTER_URL = ''; // no calls to the public foot router
 const { app } = await import('../src/index.js');
 
 let server;
@@ -162,4 +163,12 @@ test('unknown API path is a JSON 404', async () => {
   const { status, body } = await get('/api/nope');
   assert.equal(status, 404);
   assert.equal(body.error, 'Not found');
+});
+
+test('walk path: straight line when the router is off; bad coordinates are a 400', async () => {
+  const { status, body } = await get(`/api/walk-path?fromLat=${CENTRAL.lat}&fromLng=${CENTRAL.lng}&toLat=11.5712&toLng=104.9178`);
+  assert.equal(status, 200);
+  assert.equal(body.source, 'straight');
+  assert.deepEqual(body.geometry, [[CENTRAL.lat, CENTRAL.lng], [11.5712, 104.9178]]);
+  assert.equal((await get('/api/walk-path?fromLat=1')).status, 400);
 });

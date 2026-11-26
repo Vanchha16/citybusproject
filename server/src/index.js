@@ -12,12 +12,15 @@ import { searchPlaces } from './search.js';
 import { understand, resolvePlace, aiEnabled } from './assistant.js';
 import { composeAnswer } from './describe.js';
 import { haversine } from './geo.js';
-import { createLimiter, createReportLimiter, clientId } from './ratelimit.js';
+import { createLimiter, createReportLimiter, createRateLimiter, clientId } from './ratelimit.js';
+import { createWalkPaths } from './walkpath.js';
 
 const app = express();
 app.use(express.json({ limit: '20kb' }));
 const limiter = createLimiter();
 const reportLimiter = createReportLimiter();
+const walkLimiter = createRateLimiter({ max: 60, windowMs: 10 * 60_000 });
+const walkPaths = createWalkPaths();
 
 // Demo mode: the app can ask for the network "as at" a time of day (X-Demo-Clock header,
 // minutes since midnight), so a demo or rehearsal at night still shows buses running.
@@ -119,6 +122,19 @@ app.get('/api/buses', (req, res) => {
   const t = req.now;
   const vehicles = vehiclesAt(t).map(({ progressMin, scheduledDep, ...v }) => v);
   res.json({ now: t, buses: vehicles, summary: summarize(vehicles) });
+});
+
+/** A walk leg along real streets, for the map (straight line if the router is off, slow or down). */
+app.get('/api/walk-path', async (req, res) => {
+  const from = pointFromQuery(req.query, 'from');
+  const to = pointFromQuery(req.query, 'to');
+  if (!from || !to) return res.status(400).json({ error: 'fromLat, fromLng, toLat and toLng are required' });
+  const straight = { source: 'straight', geometry: [[from.lat, from.lng], [to.lat, to.lng]] };
+  if (!walkLimiter.check(clientId(req)).allowed) return res.json(straight);
+  const result = await walkPaths.path(from, to);
+  // Streets don't move: let browsers and Vercel's CDN keep street paths for a day.
+  if (result.source === 'streets') res.set('Cache-Control', 'public, max-age=86400');
+  res.json(result);
 });
 
 /** Next arrivals of one line at one stop — used by the "bus is coming" alert. */

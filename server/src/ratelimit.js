@@ -78,6 +78,21 @@ export function createReportLimiter(clock = () => Date.now()) {
   };
 }
 
+/** At most `max` requests per `windowMs` per person (e.g. walking paths: they call a free public router). */
+export function createRateLimiter({ max, windowMs }, clock = () => Date.now()) {
+  const win = new Window(windowMs);
+  let lastSweep = clock();
+  return {
+    check(clientId) {
+      const now = clock();
+      if (now - lastSweep > 5 * MINUTE) { win.sweep(now); lastSweep = now; }
+      if (win.count(clientId, now) >= max) return { allowed: false, retryAfterSec: Math.ceil(win.retryIn(clientId, now) / 1000) };
+      win.add(clientId, now);
+      return { allowed: true, retryAfterSec: 0 };
+    },
+  };
+}
+
 /** Best guess at who is asking. On Vercel these headers are set by the platform. */
 export function clientId(req) {
   const fwd = req.get('x-vercel-forwarded-for') || req.get('x-real-ip') || req.get('x-forwarded-for') || '';

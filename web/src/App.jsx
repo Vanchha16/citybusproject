@@ -97,6 +97,48 @@ function useBusAlert(lineById, lang) {
   return { watch, info, alerting, toggle, set, stop: () => setWatch(null), recheck: () => setRecheck((n) => n + 1) };
 }
 
+// Street paths for walk legs, shared by every route option: key = "lat,lng>lat,lng".
+const walkPathCache = new Map();
+const walkKey = (leg) => `${leg.from.lat.toFixed(5)},${leg.from.lng.toFixed(5)}>${leg.to.lat.toFixed(5)},${leg.to.lng.toFixed(5)}`;
+
+/** The route with its walk legs drawn along real streets once known (straight lines until then). */
+function useStreetWalks(option) {
+  const [, setVersion] = useState(0);
+  useEffect(() => {
+    if (!option) return undefined;
+    let alive = true;
+    for (const leg of option.legs) {
+      if (leg.type !== 'walk' || walkPathCache.has(walkKey(leg))) continue;
+      walkPathCache.set(walkKey(leg), null); // asked already
+      api.walkPath(leg.from, leg.to)
+        .then((r) => {
+          if (r.source !== 'streets') return;
+          walkPathCache.set(walkKey(leg), r.geometry);
+          if (alive) setVersion((v) => v + 1);
+        })
+        .catch(() => walkPathCache.delete(walkKey(leg))); // try again next time
+    }
+    return () => { alive = false; };
+  }, [option]);
+  if (!option) return option;
+  const legs = option.legs.map((l) => (l.type === 'walk' && walkPathCache.get(walkKey(l)) ? { ...l, geometry: walkPathCache.get(walkKey(l)) } : l));
+  return legs.some((l, i) => l !== option.legs[i]) ? { ...option, legs } : option;
+}
+
+/** The point `f` (0..1) of the way along a path of [lat, lng] points. */
+function alongPath(points, f) {
+  const seg = points.slice(1).map((p, i) => Math.hypot(p[0] - points[i][0], (p[1] - points[i][1]) * Math.cos((p[0] * Math.PI) / 180)));
+  let left = seg.reduce((a, b) => a + b, 0) * f;
+  for (let i = 0; i < seg.length; i++) {
+    if (left <= seg[i] || i === seg.length - 1) {
+      const t = seg[i] ? Math.min(1, left / seg[i]) : 1;
+      return { lat: points[i][0] + (points[i + 1][0] - points[i][0]) * t, lng: points[i][1] + (points[i + 1][1] - points[i][1]) * t };
+    }
+    left -= seg[i];
+  }
+  return { lat: points.at(-1)[0], lng: points.at(-1)[1] };
+}
+
 // Used when GPS is unavailable or the device is outside Phnom Penh (e.g. a judge's laptop).
 const DEMO_LOCATION = { lat: 11.5697, lng: 104.9211, demo: true };
 const PP_CENTER = { lat: 11.556, lng: 104.92 };
@@ -172,6 +214,7 @@ export default function App() {
   const [plan, setPlan] = useState(null);
   const [planning, setPlanning] = useState(false);
   const [selected, setSelected] = useState(null);
+  const selectedOnStreets = useStreetWalks(selected);
   const [onlyServing, setOnlyServing] = useState(true);
   const [nearby, setNearby] = useState(null);
   const [answer, setAnswer] = useState(null);
@@ -511,7 +554,7 @@ export default function App() {
 
   // ---- Guided demo (Settings → Start demo, or open the site with ?demo) ----
   const latest = useRef({});
-  latest.current = { plan, planKey, selected, placeById, watch: alert.watch, atStop, yourBus };
+  latest.current = { plan, planKey, selected, selectedOnStreets, placeById, watch: alert.watch, atStop, yourBus };
   const demoActions = useRef({});
   demoActions.current = {
     enter: () => { demoActive.current = true; },
@@ -545,13 +588,13 @@ export default function App() {
     walkToStop: async (fast) => {
       setFollowing(true);
       setFollowPaused(false);
-      const leg = latest.current.selected?.legs[0];
+      // Along the streets when the street path is known, else straight to the stop.
+      const leg = (latest.current.selectedOnStreets ?? latest.current.selected)?.legs[0];
       if (!leg || leg.type !== 'walk') return;
-      const [[aLat, aLng], [bLat, bLng]] = [leg.geometry[0], leg.geometry.at(-1)];
       const steps = fast ? [1] : Array.from({ length: 16 }, (_, i) => (i + 1) / 16);
       for (const f of steps) {
         if (!demoActive.current) return;
-        setHere({ lat: aLat + (bLat - aLat) * f, lng: aLng + (bLng - aLng) * f });
+        setHere(alongPath(leg.geometry, f));
         if (!fast) await sleep(500);
       }
     },
@@ -934,7 +977,7 @@ export default function App() {
             destination={destination}
             focusLineIds={focusLineIds}
             lineFocusId={destination ? null : lineFocusId}
-            option={selected}
+            option={selectedOnStreets}
             lang={lang}
             fitPadding={fitPadding}
             follow={following}
