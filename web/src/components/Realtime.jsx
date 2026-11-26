@@ -1,6 +1,7 @@
 import LineBadge from './LineBadge.jsx';
 import { clock, label, roundMin, t } from '../i18n.js';
 import { CloseIcon } from './icons.jsx';
+import { BUS_SVG } from './busShape.js';
 
 /**
  * "4 min" with a mark that says how much to trust it:
@@ -51,14 +52,21 @@ export function ReportNote({ arrival, lang, className = '' }) {
   );
 }
 
+/** The map's bus marker, small, for the legend. */
+function MiniBus({ status = 'live' }) {
+  return (
+    <span className={`bus-marker is-${status} is-legend`} aria-hidden dangerouslySetInnerHTML={{ __html: `${BUS_SVG}${status === 'suspect' ? '<span class="bus-code">?</span>' : ''}` }} />
+  );
+}
+
 /** Map legend: how many buses are live, estimated, or ignored as suspect right now. */
 export function BusLegend({ summary, lang, compact = false }) {
   const s = t(lang);
   if (!summary) return null;
   const rows = [
-    { key: 'live', count: summary.live, mark: <span className="legend-bus" /> },
-    { key: 'estimated', count: summary.estimated + summary.lost, mark: <span className="legend-bus is-estimated" /> },
-    { key: 'suspect', count: summary.suspect, mark: <span className="legend-bus is-suspect">?</span> },
+    { key: 'live', count: summary.live, mark: <MiniBus /> },
+    { key: 'estimated', count: summary.estimated + summary.lost, mark: <MiniBus status="estimated" /> },
+    { key: 'suspect', count: summary.suspect, mark: <MiniBus status="suspect" /> },
   ];
   if (compact) {
     // Phones: one small row of marks and counts; full labels are on the home page and in tooltips.

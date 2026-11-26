@@ -129,6 +129,33 @@ export function positionAt(pattern, elapsed) {
   return { lat, lng, seg, nextStopId: pattern.stopIds[seg + 1] };
 }
 
+/**
+ * Where a bus will be over the next `seconds`, along its route at timetable pace:
+ * [[lat, lng], ...] every `stepSeconds`. The map glides each bus along it between updates.
+ */
+export function pathAhead(pattern, elapsed, seconds = 6, stepSeconds = 1.5) {
+  const out = [];
+  for (let s = stepSeconds; s <= seconds + 1e-9; s += stepSeconds) {
+    const p = positionAt(pattern, Math.min(Math.max(elapsed + s / 60, 0), pattern.tripMinutes));
+    if (p) out.push([Math.round(p.lat * 1e5) / 1e5, Math.round(p.lng * 1e5) / 1e5]);
+  }
+  return out;
+}
+
+/**
+ * Compass heading (degrees: 0 north, 90 east) of a bus `elapsed` minutes into its trip,
+ * from the road just behind and ahead of it. null when it can't tell.
+ */
+export function headingAt(pattern, elapsed) {
+  const e = Math.min(Math.max(elapsed, 0), pattern.tripMinutes);
+  const a = positionAt(pattern, Math.max(0, e - 0.1));
+  const b = positionAt(pattern, Math.min(pattern.tripMinutes, e + 0.1));
+  if (!a || !b || (a.lat === b.lat && a.lng === b.lng)) return null;
+  const east = (b.lng - a.lng) * Math.cos((a.lat * Math.PI) / 180);
+  const north = b.lat - a.lat;
+  return Math.round(((Math.atan2(east, north) * 180) / Math.PI + 360) % 360);
+}
+
 /** Scheduled departures (minutes since midnight) of a pattern whose trips overlap [from, to]. */
 export function departuresBetween(pattern, from, to) {
   const out = [];

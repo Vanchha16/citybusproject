@@ -39,26 +39,42 @@ body {
 .leaflet-tile-pane { filter: grayscale(0.9) brightness(1.04) contrast(0.92); }
 .leaflet-control-attribution { font-size: 10px; }
 
-.bus-marker {
+/* Bus markers: a small side-view bus in the line colour (--bus), code on its side. */
+.bus-marker { position: relative; width: 46px; height: 26px; --bus: var(--color-ink); --edge: #fff; }
+.bus-shape { position: absolute; inset: 0; width: 46px; height: 26px; overflow: visible; filter: drop-shadow(0 1px 2px rgb(21 35 63 / 0.4)); }
+/* Leaflet sets `.leaflet-map-pane svg { z-index: 200 }`: keep the drawing under the code and arrow. */
+.bus-marker .bus-shape { z-index: 0; }
+.bus-marker .bus-code, .bus-marker .bus-dir { z-index: 1; }
+.bus-marker.is-west .bus-shape { transform: scaleX(-1); } /* driving west: face left */
+.bus-body { fill: var(--bus); stroke: var(--edge); stroke-width: 2; }
+.bus-glass { fill: #fff; opacity: 0.9; }
+.bus-wheel { fill: #15233F; stroke: #fff; stroke-width: 1.5; }
+.bus-code {
+  position: absolute; left: 2px; top: 2px; width: 32px; height: 17px;
   display: flex; align-items: center; justify-content: center;
-  width: 34px; height: 20px;
-  border-radius: 10px; border: 2px solid #fff;
-  color: #fff; font-weight: 700; font-size: 11px; line-height: 1;
-  box-shadow: 0 1px 3px rgb(21 35 63 / 0.35);
+  color: #fff; font-weight: 700; font-size: 10.5px; line-height: 1; letter-spacing: -0.2px;
 }
+.bus-marker.is-west .bus-code { left: 12px; } /* the windscreen is on the left */
+/* Which way it drives: a white dot with an arrow at the front corner. */
+.bus-dir {
+  position: absolute; top: -6px; right: -5px; width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 1px rgb(21 35 63 / 0.25);
+}
+.bus-dir::before {
+  content: ""; position: absolute; left: 3.5px; top: 2.5px;
+  border-left: 3px solid transparent; border-right: 3px solid transparent; border-bottom: 6px solid var(--bus);
+}
+.bus-marker.is-west .bus-dir { right: auto; left: -5px; }
 /* GPS trust states — the same marks are used in the legend. */
-.bus-marker.is-estimated { border-style: dashed; opacity: 0.8; }
-.bus-marker.is-lost { border-style: dashed; opacity: 0.45; }
-.bus-marker.is-suspect { background: #9aa3b2 !important; color: #fff; border-color: #fff; opacity: 0.9; }
-
-.legend-bus {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 13px; border-radius: 7px;
-  background: var(--color-ink); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--color-ink);
-  color: #fff; font-size: 9px; font-weight: 700; line-height: 1;
-}
-.legend-bus.is-estimated { border-style: dashed; opacity: 0.8; }
-.legend-bus.is-suspect { background: #9aa3b2; box-shadow: 0 0 0 1px #9aa3b2; }
+.bus-marker.is-estimated .bus-body, .bus-marker.is-lost .bus-body { stroke-dasharray: 4 2.5; }
+.bus-marker.is-estimated { opacity: 0.8; }
+.bus-marker.is-lost { opacity: 0.45; }
+.bus-marker.is-suspect { --bus: #9aa3b2; opacity: 0.9; }
+/* Legend: the same bus, smaller, outlined in ink so it shows on white. */
+.bus-marker.is-legend { display: inline-block; width: 26px; height: 15px; --edge: var(--color-ink); }
+.bus-marker.is-legend .bus-shape { width: 26px; height: 15px; filter: none; }
+.bus-marker.is-legend .bus-code { left: 1px; top: 1px; width: 19px; height: 10px; font-size: 8px; }
+.bus-marker.is-legend.is-estimated { opacity: 0.6; }
 
 .live-dot {
   width: 7px; height: 7px; border-radius: 50%; background: #16a34a;

@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
 import { label, t } from '../i18n.js';
+import { BUS_SVG } from './busShape.js';
 
 const PHNOM_PENH = [11.556, 104.92];
 
@@ -38,17 +39,70 @@ const drawWhenAdded = ({ from = 1, delay = 0, duration = 1100, fade = false }) =
 });
 const sq = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
 const busIconCache = new Map();
-function busIcon(code, color, status) {
-  const key = `${code}|${color}|${status}`;
+/**
+ * A small bus in the line's colour with its code on the side. It faces the way it drives
+ * (left or right), and a little arrow shows the exact direction. Dashed / faded / grey
+ * outline = GPS estimated / lost / suspect, as in the legend.
+ */
+function busIcon(code, color, status, heading) {
+  const dir = heading == null ? null : Math.round(heading / 15) * 15 % 360; // fewer distinct icons
+  const key = `${code}|${color}|${status}|${dir}`;
   if (!busIconCache.has(key)) {
+    const west = dir != null && dir > 180;
     busIconCache.set(key, L.divIcon({
       className: '',
-      html: `<div class="bus-marker is-${status}" style="background:${color}">${code}${status === 'suspect' ? '?' : ''}</div>`,
-      iconSize: [34, 20],
-      iconAnchor: [17, 10],
+      html: `<div class="bus-marker is-${status}${west ? ' is-west' : ''}" style="--bus:${color}">${BUS_SVG}`
+        + `<span class="bus-code">${code}${status === 'suspect' ? '?' : ''}</span>`
+        + (dir == null ? '' : `<span class="bus-dir" style="transform:rotate(${dir}deg)"></span>`)
+        + '</div>',
+      iconSize: [46, 26],
+      iconAnchor: [23, 13],
     }));
   }
   return busIconCache.get(key);
+}
+
+const GLIDE_MS = 6000; // the server's path ahead covers 6 s; updates come every 4 s
+const TELEPORT_M = 1500; // further than this (e.g. the demo clock jumped): just move there
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * A bus marker that drives: on every update it glides from where it is shown, through its
+ * reported position, along the road ahead at its own pace, instead of jumping.
+ * The position is set on the Leaflet marker directly (not through React) once per frame.
+ */
+function MovingBus({ bus, icon, zIndexOffset, children }) {
+  const markerRef = useRef(null);
+  const first = useRef([bus.lat, bus.lng]);
+  useEffect(() => {
+    const m = markerRef.current;
+    if (!m) return undefined;
+    const path = [m.getLatLng(), L.latLng(bus.lat, bus.lng), ...(bus.ahead ?? []).map((p) => L.latLng(p))];
+    const seg = path.slice(1).map((p, i) => path[i].distanceTo(p));
+    const total = seg.reduce((a, b) => a + b, 0);
+    if (reducedMotion() || total < 0.5 || seg[0] > TELEPORT_M) {
+      m.setLatLng([bus.lat, bus.lng]);
+      return undefined;
+    }
+    const t0 = performance.now();
+    let raf;
+    const step = (now) => {
+      const f = Math.min(1, (now - t0) / GLIDE_MS);
+      let d = total * f;
+      let i = 0;
+      while (i < seg.length - 1 && d > seg[i]) { d -= seg[i]; i++; }
+      const k = seg[i] ? Math.min(1, d / seg[i]) : 1;
+      m.setLatLng([path[i].lat + (path[i + 1].lat - path[i].lat) * k, path[i].lng + (path[i + 1].lng - path[i].lng) * k]);
+      if (f < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [bus]);
+  return (
+    <Marker ref={markerRef} position={first.current} icon={icon} zIndexOffset={zIndexOffset} keyboard={false}>
+      {children}
+    </Marker>
+  );
 }
 
 /** Keeps the view on whatever matters right now: the selected route, or origin + destination. */
@@ -219,21 +273,20 @@ export default function MapView({
             ? (b.reason === 'passengers' ? s.reportedMissing : s.status.suspect(b.stillMin))
             : s.status[b.status](age);
         return (
-          <Marker
+          <MovingBus
             key={b.id}
-            position={[b.lat, b.lng]}
-            icon={busIcon(line.code, line.color, b.status)}
+            bus={b}
+            icon={busIcon(line.code, line.color, b.status, b.heading)}
             zIndexOffset={b.status === 'live' ? 600 : 400}
-            keyboard={false}
           >
-            <Tooltip direction="top" offset={[0, -8]}>
+            <Tooltip direction="top" offset={[0, -14]}>
               <strong>{s.bus(b.busNo)}</strong> → {label(b.headsign, lang)}
               <br />
               {statusText}
               {b.status !== 'suspect' && <>, {s.late(Math.round(b.delayMin)).toLowerCase()}</>}
               {b.reports?.full && <>, {s.note.full.toLowerCase()}</>}
             </Tooltip>
-          </Marker>
+          </MovingBus>
         );
       })}
 

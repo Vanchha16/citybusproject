@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stops, lines, places, dataSource } from './data/dataset.js';
-import { patterns, lineGeometry, nowMinutes, boardingsAtStop, hasRoadShapes, stopById } from './schedule.js';
+import { patterns, lineGeometry, nowMinutes, boardingsAtStop, hasRoadShapes, stopById, headingAt, pathAhead } from './schedule.js';
 import { vehiclesAt, summarize, predictArrivals, annotateWithRealtime, reportIndexAt } from './realtime.js';
 import { reports, KINDS, parseTripId } from './reports.js';
 import { planTrip, stopsNear, linesServing } from './planner.js';
@@ -120,7 +120,17 @@ app.get('/api/plan', (req, res) => {
 
 app.get('/api/buses', (req, res) => {
   const t = req.now;
-  const vehicles = vehiclesAt(t).map(({ progressMin, scheduledDep, ...v }) => v);
+  // For the map: which way each bus drives, and the road it covers in the next 6 s (it glides
+  // along that until the next update). Suspect buses stand still.
+  const vehicles = vehiclesAt(t).map(({ progressMin, scheduledDep, ...v }) => {
+    const pattern = patterns[v.lineId][v.dir];
+    const moving = progressMin != null;
+    return {
+      ...v,
+      heading: moving ? headingAt(pattern, progressMin) : null,
+      ahead: moving ? pathAhead(pattern, progressMin) : [],
+    };
+  });
   res.json({ now: t, buses: vehicles, summary: summarize(vehicles) });
 });
 

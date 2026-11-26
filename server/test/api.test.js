@@ -172,3 +172,18 @@ test('walk path: straight line when the router is off; bad coordinates are a 400
   assert.deepEqual(body.geometry, [[CENTRAL.lat, CENTRAL.lng], [11.5712, 104.9178]]);
   assert.equal((await get('/api/walk-path?fromLat=1')).status, 400);
 });
+
+test('buses: each moving bus says which way it drives and the road it covers next', async () => {
+  const { body } = await get('/api/buses');
+  const moving = body.buses.filter((b) => b.status !== 'suspect');
+  assert.ok(moving.length > 0);
+  for (const b of moving) {
+    assert.ok(b.heading === null || (b.heading >= 0 && b.heading < 360), `${b.id} heading ${b.heading}`);
+    assert.ok(Array.isArray(b.ahead) && b.ahead.length >= 1, `${b.id} ahead`);
+    // 6 seconds at bus speed is tens of metres, not kilometres.
+    const [lat, lng] = b.ahead.at(-1);
+    const m = Math.hypot((lat - b.lat) * 111_000, (lng - b.lng) * 109_000);
+    assert.ok(m < 400, `${b.id} moves ${Math.round(m)} m in 6 s`);
+  }
+  for (const b of body.buses.filter((x) => x.status === 'suspect')) assert.deepEqual(b.ahead, []);
+});
