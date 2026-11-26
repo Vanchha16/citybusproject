@@ -1,5 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from './api.js';
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api, setDemoClock } from './api.js';
 import { label, t } from './i18n.js';
 import MapView from './components/MapView.jsx';
 import PlaceSearch from './components/PlaceSearch.jsx';
@@ -16,6 +16,9 @@ import LocationNotice from './components/LocationNotice.jsx';
 import DemoBar from './components/DemoBar.jsx';
 import AtStopCard from './components/AtStopCard.jsx';
 import { useDemo } from './useDemo.js';
+
+// The operator view of passenger reports, shown on top of the app in the guided demo.
+const OperatorView = lazy(() => import('./components/OperatorView.jsx'));
 import { AlertBanner, BusLegend } from './components/Realtime.jsx';
 import { ChevronIcon, LocateIcon, PinIcon, PlaneIcon, SwapIcon } from './components/icons.jsx';
 
@@ -33,6 +36,7 @@ function useBusAlert(lineById, lang) {
   const [watch, setWatch] = useState(loadWatch);
   const [info, setInfo] = useState(null);
   const [alerting, setAlerting] = useState(false);
+  const [recheck, setRecheck] = useState(0); // bump to check again now
   const alerted = useRef(null);
 
   useEffect(() => { saveWatch(watch); }, [watch]);
@@ -72,7 +76,7 @@ function useBusAlert(lineById, lang) {
     const id = setInterval(check, 15000);
     return () => { alive = false; clearInterval(id); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch]);
+  }, [watch, recheck]);
 
   const toggle = useCallback((target) => {
     setWatch((cur) => {
@@ -90,7 +94,7 @@ function useBusAlert(lineById, lang) {
     setWatch((cur) => (cur && cur.stopId === target.stopId && cur.lineId === target.lineId && cur.dir === target.dir ? cur : target));
   }, []);
 
-  return { watch, info, alerting, toggle, set, stop: () => setWatch(null) };
+  return { watch, info, alerting, toggle, set, stop: () => setWatch(null), recheck: () => setRecheck((n) => n + 1) };
 }
 
 // Used when GPS is unavailable or the device is outside Phnom Penh (e.g. a judge's laptop).
@@ -163,6 +167,7 @@ export default function App() {
   const [reportFlash, setReportFlash] = useState(null); // { stopId, kind }: "thanks" for a few seconds
   const [reportError, setReportError] = useState(false);
   const [nearbyNonce, setNearbyNonce] = useState(0); // bump to refresh nearby stops now
+  const [opsOpen, setOpsOpen] = useState(false); // operator view over the app (guided demo)
 
   const [plan, setPlan] = useState(null);
   const [planning, setPlanning] = useState(false);
@@ -506,11 +511,11 @@ export default function App() {
 
   // ---- Guided demo (Settings → Start demo, or open the site with ?demo) ----
   const latest = useRef({});
-  latest.current = { plan, planKey, selected, placeById, watch: alert.watch };
+  latest.current = { plan, planKey, selected, placeById, watch: alert.watch, atStop, yourBus };
   const demoActions = useRef({});
   demoActions.current = {
     enter: () => { demoActive.current = true; },
-    exit: () => { demoActive.current = false; setFollowing(false); locate(); },
+    exit: () => { demoActive.current = false; setFollowing(false); setOpsOpen(false); locate(); },
     reset: () => {
       reset();
       setLineFocusId(null);
@@ -522,6 +527,9 @@ export default function App() {
       setLang('en');
       setView('home');
       setSheetOpen(false);
+      setOpsOpen(false);
+      setReported({});
+      setReportFlash(null);
       if (latest.current.watch) alert.stop();
     },
     pickAirport: () => chooseDestination(latest.current.placeById.get('kti')),
@@ -547,6 +555,32 @@ export default function App() {
         if (!fast) await sleep(500);
       }
     },
+    /** Jump the demo clock to when the bus the route promised reaches the stop. */
+    busArrives: async () => {
+      const w = latest.current.watch;
+      if (!w) return;
+      try {
+        // The route's "Next bus" (walking there takes minutes; the demo walk takes seconds).
+        const planned = latest.current.selected?.legs.find((l) => l.type === 'bus')?.realtime?.at;
+        if (planned) setDemoClock(planned - 3);
+        // Then ask again: that bus may be running late.
+        const next = (await api.arrivals(w)).arrivals[0];
+        // ~40 s before it pulls in: the card says "1 min" (within 12 s it counts as gone).
+        if (next) setDemoClock(next.at - 0.7);
+      } catch { /* keep the clock */ }
+      setNearbyNonce((n) => n + 1);
+      alert.recheck();
+    },
+    /** Tap "It's here" for the passenger's bus on the stop card. */
+    reportYourBus: async () => {
+      const mine = (st, yb) => st?.departures.find((d) => yb && d.lineId === yb.lineId && d.dir === yb.dir && d.arrivals[0]?.tripId);
+      await waitFor(() => mine(latest.current.atStop, latest.current.yourBus));
+      const { atStop: st, yourBus: yb } = latest.current;
+      const dep = mine(st, yb) ?? st?.departures.find((d) => d.arrivals[0]?.tripId);
+      if (dep) await sendReport(st, dep, dep.arrivals[0], 'came');
+    },
+    openOperator: () => setOpsOpen(true),
+    closeOperator: () => setOpsOpen(false),
     setLang,
     askKhmer: () => {
       setFollowing(false);
@@ -830,7 +864,7 @@ export default function App() {
       </aside>
 
       <main className="fixed inset-0 md:relative md:h-full">
-        <div className={`pointer-events-none absolute inset-x-0 top-0 z-[1050] flex flex-col items-center gap-2 p-3 ${pickTarget ? 'hidden' : ''}`}>
+        <div className={`pointer-events-none absolute inset-x-0 top-0 z-[1050] flex flex-col items-center gap-2 p-3 ${demo.step !== null ? 'pt-20' : ''} ${pickTarget ? 'hidden' : ''}`}>
           {alert.watch && (
             <AlertBanner
               watch={alert.watch}
@@ -912,6 +946,13 @@ export default function App() {
           />
         )}
       </main>
+      {opsOpen && (
+        <div className="fixed inset-0 z-[1250]" role="dialog" aria-modal="true" aria-label={s.ops.title}>
+          <Suspense fallback={null}>
+            <OperatorView embedded lang={lang} onClose={() => setOpsOpen(false)} />
+          </Suspense>
+        </div>
+      )}
       <DemoBar demo={demo} lang={lang} />
     </div>
   );

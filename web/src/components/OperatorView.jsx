@@ -23,19 +23,22 @@ const ISSUE_STYLE = {
  * For the bus operator (open /operator): what passengers reported in the last hour,
  * turned into things to act on — buses that didn't come, GPS units to repair, lines
  * that need more buses. Passengers, GPS and the timetable feeding each other.
+ * `embedded`: shown on top of the app (guided demo), in the app's language, with a close button.
  */
-export default function OperatorView() {
-  const [lang, setLang] = useState(initialLang);
+export default function OperatorView({ embedded = false, lang: appLang, onClose }) {
+  const [ownLang, setLang] = useState(initialLang);
+  const lang = embedded ? appLang : ownLang;
   const s = t(lang);
   const [network, setNetwork] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    if (embedded) return;
     document.documentElement.lang = lang;
     document.title = `${s.ops.title} · ${s.appName}`;
     try { localStorage.setItem(LANG_KEY, lang); } catch { /* storage blocked */ }
-  }, [lang, s]);
+  }, [lang, s, embedded]);
 
   useEffect(() => {
     api.network().then(setNetwork).catch(() => setError(true));
@@ -67,22 +70,29 @@ export default function OperatorView() {
 
   return (
     <div className="h-full overflow-y-auto bg-mist" lang={lang}>
-      <div className="mx-auto max-w-5xl px-4 pb-10 pt-6">
+      {/* Embedded: room at the top for the demo bar. */}
+      <div className={`mx-auto max-w-5xl px-4 pb-10 ${embedded ? 'pt-20' : 'pt-6'}`}>
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <img src="/logo.svg" alt="" className="size-9" />
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold">{s.ops.title}</h1>
             <p className="text-sm text-ink-soft">{s.ops.subtitle}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
-            className="rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ring-line hover:bg-white"
-            lang={lang === 'en' ? 'km' : 'en'}
-          >
-            {s.switchLanguage}
-          </button>
-          <a href="/" className="rounded-full bg-brand px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">{s.ops.back}</a>
+          {embedded ? (
+            <button type="button" onClick={onClose} className="rounded-full bg-brand px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">{s.ops.back}</button>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setLang(lang === 'en' ? 'km' : 'en')}
+                className="rounded-full px-3 py-1.5 text-sm font-semibold ring-1 ring-line hover:bg-white"
+                lang={lang === 'en' ? 'km' : 'en'}
+              >
+                {s.switchLanguage}
+              </button>
+              <a href="/" className="rounded-full bg-brand px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-brand-dark">{s.ops.back}</a>
+            </>
+          )}
         </header>
 
         {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{s.error}</p>}

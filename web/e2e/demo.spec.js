@@ -18,7 +18,7 @@ test('guided demo runs start to finish with the keyboard, and Back replays corre
   await bar.getByRole('button', { name: en.demo.pause }).click();
   await page.keyboard.press('Home');
   await caption(0);
-  await expect(bar).toContainText('1/9');
+  await expect(bar).toContainText('1/12');
 
   await next(); // 2: pick the airport
   await caption(1);
@@ -51,16 +51,31 @@ test('guided demo runs start to finish with the keyboard, and Back replays corre
   const atStop = page.locator('section[aria-labelledby="atstop-h"]');
   await expect(atStop.locator('[data-your-bus]')).toBeVisible({ timeout: 12_000 });
 
-  await next(); // 7: Khmer
-  await caption(6, km);
+  await next(); // 7: the bus arrives (the demo clock jumps to it)
+  await caption(6);
+  await expect(atStop.locator('[data-your-bus]')).toContainText(/now|1 min/, { timeout: 12_000 });
+
+  await next(); // 8: one tap, "It's here"
+  await caption(7);
+  await expect(atStop.getByRole('status')).toContainText(en.report.thanks.came);
+
+  await next(); // 9: the operator sees it
+  await caption(8);
+  const ops = page.getByRole('dialog', { name: en.ops.title });
+  await expect(ops.locator('[data-report-row="came"]').filter({ hasText: 'Central Market' }).first()).toBeVisible();
+  await expect(ops.locator('[data-count="came"]')).not.toHaveText('0');
+
+  await next(); // 10: Khmer (the operator view closes)
+  await caption(9, km);
+  await expect(ops).toHaveCount(0);
   await expect(page.locator('html')).toHaveAttribute('lang', 'km');
 
-  await next(); // 8: ask in Khmer
-  await caption(7, km);
+  await next(); // 11: ask in Khmer
+  await caption(10, km);
   await expect(page.getByText(/ខ្សែឡានក្រុងដែលទៅដល់/)).toBeVisible();
 
-  await next(); // 9: thank you
-  await caption(8, km);
+  await next(); // 12: thank you
+  await caption(11, km);
   await next(); // finishes the demo
   await expect(bar).toHaveCount(0);
 });

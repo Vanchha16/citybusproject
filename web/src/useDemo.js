@@ -15,7 +15,10 @@ export const DEMO_STEPS = [
   { key: 'route', run: async (a) => { await a.waitForPlan(); a.selectBestRoute(); } },
   { key: 'alert', run: (a) => a.alertFirstBus() },
   { key: 'walk', ms: 10_000, run: (a, fast) => a.walkToStop(fast) },
-  { key: 'khmer', run: (a) => a.setLang('km') },
+  { key: 'arrive', ms: 6_000, run: (a) => a.busArrives() },
+  { key: 'report', ms: 6_000, run: (a) => a.reportYourBus() },
+  { key: 'operator', ms: 8_000, run: (a) => a.openOperator() },
+  { key: 'khmer', run: (a) => { a.closeOperator(); a.setLang('km'); } },
   { key: 'ask', ms: 8_000, run: (a) => a.askKhmer() },
   { key: 'end', run: () => {} },
 ];

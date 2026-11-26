@@ -66,9 +66,10 @@ only file to replace). Tests always run on the sample network (`CITYBUS_DATA=sam
 ## Pitch demo
 
 Open the site with **`?demo`** (e.g. `https://citybus-omega.vercel.app/?demo`) or tap
-**Settings → Start demo**. A 9-step guided tour drives the real app: pick the airport, see only
+**Settings → Start demo**. A 12-step guided tour drives the real app: pick the airport, see only
 airport buses, open the best route, set an alert, walk to the stop with the map following,
-switch to Khmer, ask in Khmer. It runs at **09:00 Phnom Penh time** whatever the real time, so
+the bus arrives (the tour's clock jumps to it), tap "It's here", see the report on the operator
+view, switch to Khmer, ask in Khmer. It runs at **09:00 Phnom Penh time** whatever the real time, so
 rehearsals at night work. Controls: → / Page Down / Space (next), ← / Page Up (back),
 Home (first step), Esc (exit). Presentation clickers work too.
 
@@ -86,8 +87,16 @@ When you reach a stop, the stop card asks about the next bus: **It's here**, **D
 
 Operators open **`/operator`** (or Settings → Operator view): report counts for the last hour, and what
 to act on: buses that didn't come, GPS units to repair, lines that need more buses.
-Limits: `REPORTS_PER_10_MIN` (12) per person. Reports are kept in memory for 3 hours, per running
-instance. For real use, move them to a shared database so every server and the operator see the same reports.
+Limits: `REPORTS_PER_10_MIN` (12) per person. Reports are kept for 3 hours. Who sent a report is
+stored only as a one-way hash (`REPORT_SALT`), never an IP address.
+
+**Shared reports on Vercel.** Vercel can run the API as several copies, each with its own memory, so
+a report sent to one copy would be missing on the others (and on `/operator`). Connect a free Redis:
+Vercel → your project → **Storage → Create → Upstash (Redis)** → connect it to the project, then
+redeploy. Vercel adds `KV_REST_API_URL` / `KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` /
+`UPSTASH_REDIS_REST_TOKEN`), and every copy then shares reports, re-reading them every 3 seconds.
+`/api/health` says `"reports": "shared"` once it works. Without it (and with `npm run dev`) reports
+stay in memory.
 
 ## AI answers and cost protection
 

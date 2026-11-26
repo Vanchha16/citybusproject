@@ -62,3 +62,10 @@ test('distances read naturally', () => {
   assert.equal(distance(1234, 'km'), '១.២ គ.ម');
   assert.equal(roundMin(0.2), 1);
 });
+
+test('every guided demo step has a caption in both languages', async () => {
+  const { DEMO_STEPS } = await import('../src/useDemo.js');
+  for (const lang of ['en', 'km']) {
+    assert.equal(t(lang).demo.steps.length, DEMO_STEPS.length, `${lang} captions`);
+  }
+});

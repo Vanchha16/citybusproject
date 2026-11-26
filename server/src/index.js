@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,16 @@ app.use('/api', (req, _res, next) => {
   req.now = Number.isFinite(demo) && demo >= 0 && demo < 1440 ? demo : nowMinutes();
   next();
 });
+
+// Reports other server copies received (shared Redis, when configured; at most every few seconds).
+app.use('/api', async (_req, _res, next) => {
+  await reports.sync();
+  next();
+});
+
+/** Reports remember who sent them only as a one-way hash, so no IP address is stored. */
+const REPORT_SALT = process.env.REPORT_SALT || 'citybus-reports';
+const reporterId = (req) => crypto.createHash('sha256').update(`${REPORT_SALT}|${clientId(req)}`).digest('base64url').slice(0, 16);
 
 const num = (v) => (v === undefined || v === '' ? NaN : Number(v));
 function pointFromQuery(q, prefix) {
@@ -62,7 +73,7 @@ function nearby(point, t) {
   return { stops: nearStops, places: nearPlaces };
 }
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, ai: aiEnabled, roadShapes: hasRoadShapes, data: dataSource, now: nowMinutes() }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, ai: aiEnabled, roadShapes: hasRoadShapes, data: dataSource, reports: reports.mode, now: nowMinutes() }));
 
 app.get('/api/network', (req, res) => {
   res.json({
@@ -134,7 +145,7 @@ app.get('/api/arrivals', (req, res) => {
  * A passenger at a stop reports the bus they were waiting for: here, didn't come, or full.
  * Body: { kind, stopId, lineId, dir, tripId } — tripId comes from the arrival the app showed.
  */
-app.post('/api/reports', (req, res) => {
+app.post('/api/reports', async (req, res) => {
   const { kind, stopId, lineId, tripId } = req.body ?? {};
   const dir = Number(req.body?.dir);
   if (!KINDS.includes(kind)) return res.status(400).json({ error: `kind must be one of ${KINDS.join(', ')}` });
@@ -150,13 +161,12 @@ app.post('/api/reports', (req, res) => {
   if (Math.abs(req.now - (trip.dep + pattern.offsets[idx])) > 60) {
     return res.status(400).json({ error: 'That bus is not due at this stop now' });
   }
-  const who = clientId(req);
-  const gate = reportLimiter.check(who);
+  const gate = reportLimiter.check(clientId(req));
   if (!gate.allowed) {
     res.set('Retry-After', String(gate.retryAfterSec));
     return res.status(429).json({ error: 'Too many reports. Please try again later.', retryAfterSec: gate.retryAfterSec });
   }
-  const { duplicate } = reports.add({ kind, stopId, lineId, dir, tripId, at: req.now, client: who });
+  const { duplicate } = await reports.add({ kind, stopId, lineId, dir, tripId, at: req.now, client: reporterId(req) });
   res.status(duplicate ? 200 : 201).json({ ok: true, duplicate });
 });
 
