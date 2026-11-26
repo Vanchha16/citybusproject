@@ -65,9 +65,11 @@ export default function RideToStop({ leg, lang }) {
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl ring-1 ring-line">
             {RIDE_APPS.map((app) => (
               <li key={app.key}>
-                <button type="button" onClick={() => openApp(app)} className="flex w-full items-center justify-between px-4 py-3.5 text-left font-semibold hover:bg-mist">
-                  {s.openApp(app.name)}
-                  <ChevronIcon className="size-4 text-ink-faint" />
+                <button type="button" onClick={() => openApp(app)} className="flex w-full items-center gap-3 px-4 py-3 text-left font-semibold hover:bg-mist">
+                  {/* The app's own icon; the text already names it, so screen readers skip the picture. */}
+                  <img src={app.icon} alt="" width="36" height="36" className="size-9 shrink-0 rounded-[22%] ring-1 ring-line" />
+                  <span className="min-w-0 flex-1">{s.openApp(app.name)}</span>
+                  <ChevronIcon className="size-4 shrink-0 text-ink-faint" />
                 </button>
               </li>
             ))}

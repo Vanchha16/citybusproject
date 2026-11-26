@@ -13,16 +13,19 @@ export const RIDE_KMH = 18;
 export const rideMinutes = (meters) => Math.max(2, Math.round(meters / ((RIDE_KMH * 1000) / 60)));
 
 // Official store listings (verified): App Store app id / Google Play package.
+// Icons: each app's own App Store icon (96 px), shown only to label the link to that app.
 export const RIDE_APPS = [
   {
     key: 'grab',
     name: 'Grab',
+    icon: '/rides/grab.png',
     ios: 'https://apps.apple.com/app/id647268330',
     android: 'https://play.google.com/store/apps/details?id=com.grabtaxi.passenger',
   },
   {
     key: 'passapp',
     name: 'PassApp',
+    icon: '/rides/passapp.png',
     ios: 'https://apps.apple.com/app/id1535615747',
     android: 'https://play.google.com/store/apps/details?id=kh.com.passapp.passenger',
   },

@@ -253,6 +253,10 @@ test.describe('ride to the bus stop', () => {
     await expect(ride).toContainText(/About \d+ min/);
     await expect(ride).toContainText(s.streetRide);
     await expect(ride.getByRole('button', { name: s.openApp('PassApp') })).toBeVisible();
+    // Each app shows its own icon, and both icons load.
+    const icons = ride.locator('img');
+    await expect(icons).toHaveCount(2);
+    await expect.poll(() => icons.evaluateAll((imgs) => imgs.map((i) => i.complete && i.naturalWidth))).toEqual([96, 96]);
 
     // Esc closes it; it opens again from the same button.
     await page.keyboard.press('Escape');
