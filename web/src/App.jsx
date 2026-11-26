@@ -16,128 +16,14 @@ import LocationNotice from './components/LocationNotice.jsx';
 import DemoBar from './components/DemoBar.jsx';
 import AtStopCard from './components/AtStopCard.jsx';
 import { useDemo } from './useDemo.js';
-
-// The operator view of passenger reports, shown on top of the app in the guided demo.
-const OperatorView = lazy(() => import('./components/OperatorView.jsx'));
+import { useBusAlert } from './hooks/useBusAlert.js';
+import { useStreetWalks, alongPath } from './hooks/useStreetWalks.js';
+import { useIsDesktop, initialLang, LANG_KEY, useInstall } from './hooks/useDevice.js';
 import { AlertBanner, BusLegend } from './components/Realtime.jsx';
 import { ChevronIcon, LocateIcon, PinIcon, PlaneIcon, SwapIcon } from './components/icons.jsx';
 
-const ALERT_MINUTES = 5;
-const WATCH_KEY = 'citybus.watch';
-const loadWatch = () => {
-  try { return JSON.parse(localStorage.getItem(WATCH_KEY)) ?? null; } catch { return null; }
-};
-const saveWatch = (w) => {
-  try { if (w) localStorage.setItem(WATCH_KEY, JSON.stringify(w)); else localStorage.removeItem(WATCH_KEY); } catch { /* private mode */ }
-};
-
-/** "Bus is coming" alert: poll the next arrival and notify once it's ALERT_MINUTES away. */
-function useBusAlert(lineById, lang) {
-  const [watch, setWatch] = useState(loadWatch);
-  const [info, setInfo] = useState(null);
-  const [alerting, setAlerting] = useState(false);
-  const [recheck, setRecheck] = useState(0); // bump to check again now
-  const alerted = useRef(null);
-
-  useEffect(() => { saveWatch(watch); }, [watch]);
-
-  useEffect(() => {
-    if (!watch) return;
-    let alive = true;
-    alerted.current = null;
-    setAlerting(false);
-    setInfo(null);
-    const check = async () => {
-      try {
-        const r = await api.arrivals(watch);
-        if (!alive) return;
-        const next = r.arrivals[0] ?? null;
-        setInfo({ next, now: r.now });
-        if (alerted.current && r.now - alerted.current.at > 3) {
-          setWatch(null); // the bus we alerted about has come and gone
-          return;
-        }
-        if (next && next.at - r.now <= ALERT_MINUTES && !alerted.current) {
-          alerted.current = { at: next.at };
-          setAlerting(true);
-          const s = t(lang);
-          const code = lineById.get(watch.lineId)?.code ?? '';
-          const body = s.alertBody(Math.max(1, Math.round(next.at - r.now)), label(watch.stopName, lang));
-          try {
-            if ('Notification' in window && Notification.permission === 'granted') {
-              new Notification(s.alertTitle(code), { body, tag: 'citybus-alert', icon: '/logo.svg' });
-            }
-          } catch { /* some mobile browsers only allow notifications from a service worker */ }
-          navigator.vibrate?.([250, 120, 250]);
-        }
-      } catch { /* keep the last info; try again next tick */ }
-    };
-    check();
-    const id = setInterval(check, 15000);
-    return () => { alive = false; clearInterval(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch, recheck]);
-
-  const toggle = useCallback((target) => {
-    setWatch((cur) => {
-      const same = cur && cur.stopId === target.stopId && cur.lineId === target.lineId && cur.dir === target.dir;
-      if (same) return null;
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
-      }
-      return target;
-    });
-  }, []);
-
-  /** Turn the alert on for `target` (no-op if it already is). */
-  const set = useCallback((target) => {
-    setWatch((cur) => (cur && cur.stopId === target.stopId && cur.lineId === target.lineId && cur.dir === target.dir ? cur : target));
-  }, []);
-
-  return { watch, info, alerting, toggle, set, stop: () => setWatch(null), recheck: () => setRecheck((n) => n + 1) };
-}
-
-// Street paths for walk legs, shared by every route option: key = "lat,lng>lat,lng".
-const walkPathCache = new Map();
-const walkKey = (leg) => `${leg.from.lat.toFixed(5)},${leg.from.lng.toFixed(5)}>${leg.to.lat.toFixed(5)},${leg.to.lng.toFixed(5)}`;
-
-/** The route with its walk legs drawn along real streets once known (straight lines until then). */
-function useStreetWalks(option) {
-  const [, setVersion] = useState(0);
-  useEffect(() => {
-    if (!option) return undefined;
-    let alive = true;
-    for (const leg of option.legs) {
-      if (leg.type !== 'walk' || walkPathCache.has(walkKey(leg))) continue;
-      walkPathCache.set(walkKey(leg), null); // asked already
-      api.walkPath(leg.from, leg.to)
-        .then((r) => {
-          if (r.source !== 'streets') return;
-          walkPathCache.set(walkKey(leg), r.geometry);
-          if (alive) setVersion((v) => v + 1);
-        })
-        .catch(() => walkPathCache.delete(walkKey(leg))); // try again next time
-    }
-    return () => { alive = false; };
-  }, [option]);
-  if (!option) return option;
-  const legs = option.legs.map((l) => (l.type === 'walk' && walkPathCache.get(walkKey(l)) ? { ...l, geometry: walkPathCache.get(walkKey(l)) } : l));
-  return legs.some((l, i) => l !== option.legs[i]) ? { ...option, legs } : option;
-}
-
-/** The point `f` (0..1) of the way along a path of [lat, lng] points. */
-function alongPath(points, f) {
-  const seg = points.slice(1).map((p, i) => Math.hypot(p[0] - points[i][0], (p[1] - points[i][1]) * Math.cos((p[0] * Math.PI) / 180)));
-  let left = seg.reduce((a, b) => a + b, 0) * f;
-  for (let i = 0; i < seg.length; i++) {
-    if (left <= seg[i] || i === seg.length - 1) {
-      const t = seg[i] ? Math.min(1, left / seg[i]) : 1;
-      return { lat: points[i][0] + (points[i + 1][0] - points[i][0]) * t, lng: points[i][1] + (points[i + 1][1] - points[i][1]) * t };
-    }
-    left -= seg[i];
-  }
-  return { lat: points.at(-1)[0], lng: points.at(-1)[1] };
-}
+// The operator view of passenger reports, shown on top of the app in the guided demo.
+const OperatorView = lazy(() => import('./components/OperatorView.jsx'));
 
 // Used when GPS is unavailable or the device is outside Phnom Penh (e.g. a judge's laptop).
 const DEMO_LOCATION = { lat: 11.5697, lng: 104.9211, demo: true };
@@ -156,30 +42,10 @@ const POPULAR = ['kti', 'central-market', 'royal-palace', 'aeon2', 'russian-mark
 const kmBetween = (a, b) => Math.hypot((a.lat - b.lat) * 111, (a.lng - b.lng) * 109);
 const pointKey = (p) => (p ? `${p.lat.toFixed(5)},${p.lng.toFixed(5)}` : '');
 
-function useIsDesktop() {
-  const query = '(min-width: 768px)';
-  const [desktop, setDesktop] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    const on = () => setDesktop(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  return desktop;
-}
-
-const LANG_KEY = 'citybus.lang';
-function initialLang() {
-  try {
-    const saved = localStorage.getItem(LANG_KEY);
-    if (saved === 'km' || saved === 'en') return saved;
-  } catch { /* storage blocked */ }
-  return navigator.language?.startsWith('km') ? 'km' : 'en';
-}
-
 export default function App() {
   const [lang, setLang] = useState(initialLang);
   const s = t(lang);
+  const install = useInstall();
 
   // Remember the choice, and tell browsers and screen readers which language the page is in.
   useEffect(() => {
@@ -899,6 +765,7 @@ export default function App() {
               lineById={lineById}
               onStopWatch={alert.stop}
               onStartDemo={demo.start}
+              install={install}
             />
           )}
           {error && !isTrip && <p className="mx-4 mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{error}</p>}

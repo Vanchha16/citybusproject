@@ -70,6 +70,11 @@ body {
 .bus-marker.is-estimated { opacity: 0.8; }
 .bus-marker.is-lost { opacity: 0.45; }
 .bus-marker.is-suspect { --bus: #9aa3b2; opacity: 0.9; }
+/* Zoomed out: a dot in the line colour (same trust looks: dashed/faded/grey). */
+.bus-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bus); border: 2px solid #fff; box-shadow: 0 1px 2px rgb(21 35 63 / 0.4); }
+.bus-dot.is-estimated, .bus-dot.is-lost { border-style: dashed; opacity: 0.8; }
+.bus-dot.is-lost { opacity: 0.45; }
+.bus-dot.is-suspect { background: #9aa3b2; }
 /* Legend: the same bus, smaller, outlined in ink so it shows on white. */
 .bus-marker.is-legend { display: inline-block; width: 26px; height: 15px; --edge: var(--color-ink); }
 .bus-marker.is-legend .bus-shape { width: 26px; height: 15px; filter: none; }

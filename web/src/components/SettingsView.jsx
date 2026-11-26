@@ -2,7 +2,7 @@ import LineBadge from './LineBadge.jsx';
 import Flag from './Flag.jsx';
 import { label, t } from '../i18n.js';
 
-export default function SettingsView({ lang, setLang, aiEnabled, dataSource, watch, lineById, onStopWatch, onStartDemo }) {
+export default function SettingsView({ lang, setLang, aiEnabled, dataSource, watch, lineById, onStopWatch, onStartDemo, install }) {
   const s = t(lang);
   const line = watch ? lineById.get(watch.lineId) : null;
   return (
@@ -20,6 +20,21 @@ export default function SettingsView({ lang, setLang, aiEnabled, dataSource, wat
           <span className="block text-sm text-white">{s.demo.hint}</span>
         </span>
       </button>
+
+      {install && !install.installed && (install.canPrompt || install.ios) && (
+        <section aria-labelledby="install-h" className="flex items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-line">
+          <img src="/icons/icon-192.png" alt="" className="size-12 shrink-0 rounded-xl" />
+          <div className="min-w-0 flex-1">
+            <h2 id="install-h" className="font-semibold">{s.install.title}</h2>
+            <p className="text-sm text-ink-soft">{install.canPrompt ? s.install.hint : s.install.ios}</p>
+          </div>
+          {install.canPrompt && (
+            <button type="button" onClick={install.install} className="shrink-0 rounded-xl bg-brand px-4 py-2.5 font-semibold text-white hover:bg-brand-dark">
+              {s.install.button}
+            </button>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="lang-h">
         <h2 id="lang-h" className="mb-2 text-sm font-semibold text-ink-soft">{s.language}</h2>

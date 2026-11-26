@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { label, t } from '../i18n.js';
 import { RIDE_APPS, appLink, rideMinutes } from '../rides.js';
 import { ChevronIcon, CloseIcon } from './icons.jsx';
@@ -10,11 +10,13 @@ import { ChevronIcon, CloseIcon } from './icons.jsx';
  * Play if it isn't installed); elsewhere their store page (see rides.js). The stop
  * name is copied to paste as the drop-off.
  */
-export default function RideToStop({ leg, lang }) {
+export default function RideToStop({ leg, lang, toName }) {
   const s = t(lang);
   const dialogRef = useRef(null);
+  const headingId = useId(); // two ride popups can be on one route (first and last walk)
   const [copied, setCopied] = useState(false);
-  const stopName = label(leg.to.name, lang);
+  // Where the ride goes: the bus stop (first walk), or the destination (last walk).
+  const stopName = toName || label(leg.to.name, lang);
   const minutes = rideMinutes(leg.meters);
 
   const contentRef = useRef(null);
@@ -36,7 +38,7 @@ export default function RideToStop({ leg, lang }) {
         type="button"
         onClick={openSheet}
         className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-brand ring-1 ring-line hover:bg-mist"
-        data-ride-to-stop=""
+        data-ride-to-stop={toName ? 'destination' : 'stop'}
       >
         <span aria-hidden>🛵</span>
         {s.rideInstead(minutes)}
@@ -44,7 +46,7 @@ export default function RideToStop({ leg, lang }) {
 
       <dialog
         ref={dialogRef}
-        aria-labelledby="ride-h"
+        aria-labelledby={headingId}
         onClick={(e) => { if (e.target === dialogRef.current) closeSheet(); }} // tap outside closes
         className="ride-sheet m-0 mt-auto w-full max-w-none rounded-t-2xl bg-white p-0 text-ink shadow-2xl backdrop:bg-ink/40 md:m-auto md:max-w-sm md:rounded-2xl"
       >
@@ -52,7 +54,7 @@ export default function RideToStop({ leg, lang }) {
           <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-line md:hidden" aria-hidden />
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <h2 id="ride-h" className="truncate text-lg font-bold">{s.rideTo(stopName)}</h2>
+              <h2 id={headingId} className="truncate text-lg font-bold">{s.rideTo(stopName)}</h2>
               <p className="text-sm text-ink-soft">{s.rideAbout(minutes)}</p>
             </div>
             <button type="button" onClick={closeSheet} className="-mr-1.5 flex size-9 shrink-0 items-center justify-center rounded-full text-ink-faint hover:bg-mist hover:text-ink" aria-label={s.close}>

@@ -244,7 +244,7 @@ test.describe('ride to the bus stop', () => {
     const s = await openHome(page);
     await searchDestination(page, s, 'airport', 'Techo International Airport');
     await routeOptions(page).first().click();
-    const button = page.locator('[data-ride-to-stop]');
+    const button = page.locator('[data-ride-to-stop="stop"]');
     await expect(button).toHaveText(/Ride instead · \d+ min/);
 
     await button.click();
@@ -286,6 +286,24 @@ test.describe('ride to the bus stop', () => {
     }
 
     await ride.getByRole('button', { name: s.close }).click();
+    await expect(ride).toBeHidden();
+  });
+});
+
+test.describe('ride from the last stop to the destination', () => {
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: 11.5712, longitude: 104.9178 } });
+
+  test('a trip that ends with a walk offers a ride to the destination itself', async ({ page }) => {
+    const s = await openHome(page);
+    const place = await searchDestination(page, s, 'museum', 'National Museum');
+    await routeOptions(page).first().click();
+    const last = page.locator('[data-ride-to-stop="destination"]');
+    await expect(last).toHaveText(/Ride instead · \d+ min/);
+    await last.click();
+    const ride = page.getByRole('dialog', { name: s.rideTo(place) });
+    await expect(ride).toBeVisible();
+    await expect(ride.getByRole('link', { name: s.openApp('Grab') })).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(ride).toBeHidden();
   });
 });

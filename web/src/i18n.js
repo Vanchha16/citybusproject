@@ -152,6 +152,12 @@ const strings = {
     seenByPassenger: (stop, min) => (min < 1 ? `A passenger saw it at ${stop} just now` : `A passenger saw it at ${stop} ${min} min ago`),
     reportedMissing: "Passengers say it didn't come, ignored",
     gpsFault: 'GPS unit not working',
+    install: {
+      title: 'Install the app',
+      hint: 'Open City Bus from your home screen, like any app.',
+      button: 'Install',
+      ios: 'On iPhone: tap Share, then “Add to Home Screen”.',
+    },
     opsLink: 'Operator view',
     opsHint: 'What passengers are reporting, live',
     ops: {
@@ -359,6 +365,12 @@ const strings = {
     seenByPassenger: (stop, min) => (min < 1 ? `អ្នកដំណើរទើបឃើញនៅ ${stop}` : `អ្នកដំណើរឃើញនៅ ${stop} ${kmNum(min)} នាទីមុន`),
     reportedMissing: 'អ្នកដំណើរថាឡានមិនបានមក មិនគិត',
     gpsFault: 'ឧបករណ៍ GPS មិនដំណើរការ',
+    install: {
+      title: 'ដំឡើងកម្មវិធី',
+      hint: 'បើកឡានក្រុងពីអេក្រង់ដើម ដូចកម្មវិធីផ្សេងៗ។',
+      button: 'ដំឡើង',
+      ios: 'នៅលើ iPhone៖ ចុច Share រួចជ្រើស «Add to Home Screen»។',
+    },
     opsLink: 'ផ្ទាំងប្រតិបត្តិករ',
     opsHint: 'អ្វីដែលអ្នកដំណើរកំពុងរាយការណ៍ ផ្ទាល់',
     ops: {

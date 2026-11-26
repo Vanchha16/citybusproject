@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
-import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Marker, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Circle, CircleMarker, Marker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { label, t } from '../i18n.js';
 import { BUS_SVG } from './busShape.js';
 
@@ -44,7 +44,8 @@ const busIconCache = new Map();
  * (left or right), and a little arrow shows the exact direction. Dashed / faded / grey
  * outline = GPS estimated / lost / suspect, as in the legend.
  */
-function busIcon(code, color, status, heading) {
+function busIcon(code, color, status, heading, compact = false) {
+  if (compact) return busDot(color, status);
   const dir = heading == null ? null : Math.round(heading / 15) * 15 % 360; // fewer distinct icons
   const key = `${code}|${color}|${status}|${dir}`;
   if (!busIconCache.has(key)) {
@@ -60,6 +61,29 @@ function busIcon(code, color, status, heading) {
     }));
   }
   return busIconCache.get(key);
+}
+
+/** Zoomed out over the whole city, a bus is a dot in its line colour (100 bus drawings would pile up). */
+function busDot(color, status) {
+  const key = `dot|${color}|${status}`;
+  if (!busIconCache.has(key)) {
+    busIconCache.set(key, L.divIcon({
+      className: '',
+      html: `<div class="bus-dot is-${status}" style="--bus:${color}"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    }));
+  }
+  return busIconCache.get(key);
+}
+/** From this zoom in, buses are drawn as buses; further out, as dots. */
+export const BUS_DRAWING_ZOOM = 14;
+
+/** Tells the map view its zoom level (it lives inside the map). */
+function ZoomWatcher({ onZoom }) {
+  const map = useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
+  useEffect(() => { onZoom(map.getZoom()); }, [map, onZoom]);
+  return null;
 }
 
 const GLIDE_MS = 6000; // the server's path ahead covers 6 s; updates come every 4 s
@@ -163,6 +187,8 @@ export default function MapView({
 }) {
   const s = t(lang);
   const lineById = useMemo(() => new Map(network.lines.map((l) => [l.id, l])), [network]);
+  const [zoom, setZoom] = useState(12);
+  const compactBuses = zoom < BUS_DRAWING_ZOOM;
   const focused = (id) => !focusLineIds || focusLineIds.has(id);
   const routeLineIds = option ? new Set(option.legs.filter((l) => l.type === 'bus').map((l) => l.lineId)) : null;
 
@@ -202,6 +228,7 @@ export default function MapView({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         maxZoom={19}
       />
+      <ZoomWatcher onZoom={setZoom} />
 
       {/* Network lines: faded when a destination or route narrows the view. */}
       {network.lines.map((line) => {
@@ -276,10 +303,10 @@ export default function MapView({
           <MovingBus
             key={b.id}
             bus={b}
-            icon={busIcon(line.code, line.color, b.status, b.heading)}
+            icon={busIcon(line.code, line.color, b.status, b.heading, compactBuses)}
             zIndexOffset={b.status === 'live' ? 600 : 400}
           >
-            <Tooltip direction="top" offset={[0, -14]}>
+            <Tooltip direction="top" offset={[0, compactBuses ? -6 : -14]}>
               <strong>{s.bus(b.busNo)}</strong> → {label(b.headsign, lang)}
               <br />
               {statusText}

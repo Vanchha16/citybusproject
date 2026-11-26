@@ -7,6 +7,11 @@ import App from './App.jsx';
 const OperatorView = lazy(() => import('./components/OperatorView.jsx'));
 const isOperator = window.location.pathname.replace(/\/+$/, '') === '/operator';
 
+// Installable app + alert notifications (production only: in development it would cache old code).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     {isOperator ? <Suspense fallback={null}><OperatorView /></Suspense> : <App />}

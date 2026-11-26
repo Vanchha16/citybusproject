@@ -41,8 +41,9 @@ export default function RouteSteps({ option, destination, lineById, stopById, la
                       <span className="block text-ink">{target}</span>
                     </span>
                   </p>
-                  {/* The walk to the first bus stop can also be a ride (shown on every route). */}
+                  {/* The walk to the first bus stop, and from the last stop to the destination, can be a ride. */}
                   {i === 0 && leg.to.stopId && <RideToStop leg={leg} lang={lang} />}
+                  {isLast && i > 0 && !leg.to.stopId && <RideToStop leg={leg} lang={lang} toName={target} />}
                 </div>
               </li>
             );

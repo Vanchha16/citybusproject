@@ -39,28 +39,31 @@ function stillForMin(entry) {
 }
 
 /**
- * Where along its route the bus is, in timetable minutes. When the road doubles
- * back and the point matches several places, pick the one that fits the bus's
- * earlier fix (it moved forward at a believable pace), then the timetable.
+ * Where along its route the bus is, in timetable minutes. When the road doubles back
+ * (out and back along one street, a loop at a terminal) the point matches several places.
+ * Replay each one: if the bus is really there now, then moving at its pace it was
+ * Δt minutes further back along the route when each earlier fix was taken. The place whose
+ * replay lands closest to where GPS actually put the bus earlier wins; the timetable only
+ * breaks ties (and decides when there is no earlier fix).
  */
 function locateOnRoute(pattern, e) {
   const cands = projectCandidates(pattern, e.fix);
   if (cands.length === 1) return cands[0].minutes;
   const onTime = e.fix.t - e.scheduledDep; // progress if exactly on time
   const prior = (m) => (m > onTime + 1 ? (m - onTime) * 3 : (onTime - m) * 0.3); // early is rarer than late
-  // Use the OLDEST fix where the bus was somewhere else: a short look-back can be
-  // ambiguous in the same way when a route covers the same road twice.
-  const prev = [...e.history].reverse().find((h) => haversine(h, e.fix) > 40 && h.t < e.fix.t);
-  const prevCands = prev ? projectCandidates(pattern, prev) : [];
+  const past = e.history.filter((h) => h.t < e.fix.t);
   let best = null;
   for (const c of cands) {
-    let cost = prior(c.minutes) * 0.2;
-    if (prevCands.length) {
-      const dt = e.fix.t - prev.t;
-      cost += Math.min(...prevCands.map((p) => {
-        const moved = c.minutes - p.minutes;
-        return moved < -0.2 ? 99 : Math.abs(moved - dt) * (moved > dt ? 2 : 0.5); // can't go backwards or faster than the timetable
-      }));
+    let cost = prior(c.minutes) * 0.05;
+    if (past.length) {
+      let miss = 0;
+      for (const h of past) {
+        const back = c.minutes - (e.fix.t - h.t);
+        // A few seconds "before the start" is rounding (the bus was at its terminal); more is the wrong place.
+        const then = back >= -0.25 ? positionAt(pattern, Math.max(0, back)) : null;
+        miss += then ? Math.min(haversine(then, h), 1000) : 1000;
+      }
+      cost += miss / past.length / 50; // 50 m average mismatch ≈ 1
     } else {
       cost = prior(c.minutes);
     }
