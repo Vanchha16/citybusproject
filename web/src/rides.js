@@ -1,9 +1,14 @@
 // Getting to the bus stop by ride instead of walking.
 //
-// Grab and PassApp publish no documented way to open their apps with the pickup
-// or drop-off filled in, so we link to each app's OFFICIAL store page: on a
-// phone it shows "Open" when the app is installed, "Install" otherwise. The stop
-// name is copied so the passenger can paste it as the drop-off.
+// Opening the app:
+//   Android  the app itself, launched by its package name (an Android "intent" link
+//            Chrome and Samsung Internet understand); not installed -> Google Play
+//   iPhone   the App Store page, which shows "Open" when the app is installed. Opening
+//            an iPhone app directly needs its URL scheme, and neither Grab nor PassApp
+//            documents one (a wrong guess shows Safari's "address is invalid" error)
+//   computer the Google Play page
+// Neither app documents a way to pre-fill the pickup or drop-off, so the stop name is
+// copied for the passenger to paste as the drop-off.
 
 // Average door-to-door speed in Phnom Penh city traffic. An assumption, not
 // measured: change it here if you have better numbers.
@@ -33,6 +38,21 @@ export const RIDE_APPS = [
 
 const isApple = () =>
   /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isAndroid = () => /Android/i.test(navigator.userAgent);
 
 /** The store page for this device (App Store on iPhone/iPad, Google Play otherwise). */
 export const storeUrl = (app) => (isApple() ? app.ios : app.android);
+
+/** Android package name, from the Google Play link. */
+export const androidPackage = (app) => new URL(app.android).searchParams.get('id');
+
+/** Android: open the installed app (its launcher screen); not installed -> its Google Play page. */
+export const androidIntentUrl = (app) =>
+  `intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=${androidPackage(app)};`
+  + `S.browser_fallback_url=${encodeURIComponent(app.android)};end`;
+
+/** Where the "Open Grab / PassApp" link goes on this device, and whether it opens a new tab. */
+export function appLink(app) {
+  if (isAndroid()) return { href: androidIntentUrl(app), newTab: false };
+  return { href: storeUrl(app), newTab: true };
+}

@@ -252,7 +252,7 @@ test.describe('ride to the bus stop', () => {
     await expect(ride).toBeVisible();
     await expect(ride).toContainText(/About \d+ min/);
     await expect(ride).toContainText(s.streetRide);
-    await expect(ride.getByRole('button', { name: s.openApp('PassApp') })).toBeVisible();
+    await expect(ride.getByRole('link', { name: s.openApp('PassApp') })).toBeVisible();
     // Each app shows its own icon, and both icons load.
     const icons = ride.locator('img');
     await expect(icons).toHaveCount(2);
@@ -265,17 +265,25 @@ test.describe('ride to the bus stop', () => {
     await expect(ride).toBeVisible();
 
     // Opens Grab's official store page (App Store on iPhone, Google Play elsewhere).
-    // The stores are intercepted: we check which page was opened without loading it.
-    const opened = [];
-    await page.context().route(/https:\/\/(apps\.apple\.com|play\.google\.com)\/.*/, (route) => {
-      opened.push(route.request().url());
-      return route.fulfill({ status: 200, contentType: 'text/html', body: 'store' });
-    });
-    await ride.getByRole('button', { name: s.openApp('Grab') }).click();
-    const expected = info.project.name === 'iphone'
-      ? 'https://apps.apple.com/app/id647268330'
-      : 'https://play.google.com/store/apps/details?id=com.grabtaxi.passenger';
-    await expect.poll(() => opened).toContain(expected);
+    const grab = ride.getByRole('link', { name: s.openApp('Grab') });
+    if (info.project.name === 'phone') {
+      // Android: opens the Grab app itself, or Google Play if it isn't installed.
+      await expect(grab).toHaveAttribute('href', /^intent:#Intent;.*package=com\.grabtaxi\.passenger;S\.browser_fallback_url=https%3A%2F%2Fplay\.google\.com/);
+      await expect(ride.getByRole('link', { name: s.openApp('PassApp') })).toHaveAttribute('href', /package=kh\.com\.passapp\.passenger;/);
+    } else {
+      // iPhone: the App Store page (shows "Open" when installed); computer: Google Play.
+      // The stores are intercepted: we check which page was opened without loading it.
+      const opened = [];
+      await page.context().route(/https:\/\/(apps\.apple\.com|play\.google\.com)\/.*/, (route) => {
+        opened.push(route.request().url());
+        return route.fulfill({ status: 200, contentType: 'text/html', body: 'store' });
+      });
+      await grab.click();
+      const expected = info.project.name === 'iphone'
+        ? 'https://apps.apple.com/app/id647268330'
+        : 'https://play.google.com/store/apps/details?id=com.grabtaxi.passenger';
+      await expect.poll(() => opened).toContain(expected);
+    }
 
     await ride.getByRole('button', { name: s.close }).click();
     await expect(ride).toBeHidden();
