@@ -37,7 +37,7 @@ test('health', async () => {
 test('network has stops, lines with geometry, and places', async () => {
   const { body } = await get('/api/network');
   assert.ok(body.stops.length > 20);
-  assert.equal(body.lines.length, 7);
+  assert.equal(body.lines.length, 12);
   for (const l of body.lines) {
     assert.ok(l.geometry.length >= l.stops.length, `${l.code} geometry`);
     assert.equal(l.headsigns.length, 2);

@@ -113,11 +113,11 @@ test.describe('ask in Khmer or English', () => {
 });
 
 test.describe('other tabs', () => {
-  test('lines: all seven lines, open one to see its stops', async ({ page }) => {
+  test('lines: all twelve lines, open one to see its stops', async ({ page }) => {
     const s = await openHome(page);
     await nav(page, s, 'lines').click();
     await expect(page.getByRole('heading', { name: s.allLines })).toBeVisible();
-    await expect(page.locator('main, aside').getByRole('listitem').filter({ has: page.locator('span.font-bold') })).toHaveCount(7);
+    await expect(page.locator('main, aside').getByRole('listitem').filter({ has: page.locator('span.font-bold') })).toHaveCount(12);
     await page.getByRole('button', { name: /1A/ }).click();
     await expect(page.getByText(s.lineStops)).toBeVisible();
     await expect(page.locator('section[aria-labelledby="line-h"] ol > li')).toHaveCount(9);

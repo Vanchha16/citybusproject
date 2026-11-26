@@ -48,6 +48,10 @@ export const stops = [
   { id: 'TOULKORK', name: { en: 'Toul Kork (TK Avenue)', km: 'ទួលគោក' }, lat: 11.583, lng: 104.9 },
   { id: 'HUNSEN_KS', name: { en: 'Hun Sen Blvd (Kandal Stueng)', km: 'មហាវិថីហ៊ុន សែន (កណ្ដាលស្ទឹង)' }, lat: 11.44, lng: 104.923 },
   { id: 'KTI', name: { en: 'Techo International Airport', km: 'អាកាសយានដ្ឋានអន្តរជាតិតេជោ' }, lat: 11.3629, lng: 104.9166 },
+  { id: 'RAILWAY', name: { en: 'Railway Station', km: 'ស្ថានីយ៍រថភ្លើង' }, lat: 11.5725, lng: 104.916 },
+  { id: 'CALMETTE', name: { en: 'Calmette Hospital', km: 'មន្ទីរពេទ្យកាល់ម៉ែត' }, lat: 11.581, lng: 104.918 },
+  { id: 'NAGAWORLD', name: { en: 'NagaWorld', km: 'ណាហ្គាវើលដ៍' }, lat: 11.5525, lng: 104.9335 },
+  { id: 'CHIPMONG271', name: { en: 'Chip Mong 271 Mega Mall', km: 'ឈីបម៉ុង ២៧១ មេហ្គាម៉ល' }, lat: 11.53, lng: 104.902 },
 ];
 
 /** @type {Line[]} */
@@ -81,6 +85,36 @@ export const lines = [
     name: { en: 'Central Market – AEON Mean Chey', km: 'ផ្សារធំថ្មី - អ៊ីអន មានជ័យ' },
     headwayMin: 15, speedKmh: 17, serviceStart: '05:30', serviceEnd: '20:30',
     stops: ['CENTRAL', 'BKK', 'RUSSIAN', 'AEONMEANCHEY'],
+  },
+  {
+    id: 'L06', code: '6A', color: '#be185d', kind: 'city',
+    name: { en: 'Toul Kork – Koh Pich', km: 'ទួលគោក - កោះពេជ្រ' },
+    headwayMin: 15, speedKmh: 16, serviceStart: '05:30', serviceEnd: '20:30',
+    stops: ['TOULKORK', 'CALMETTE', 'RAILWAY', 'CENTRAL', 'ROYALPALACE', 'NAGAWORLD', 'KOHPICH'],
+  },
+  {
+    id: 'L07', code: '7A', color: '#4d7c0f', kind: 'city',
+    name: { en: 'Russey Keo – Stung Meanchey', km: 'ឫស្សីកែវ - ស្ទឹងមានជ័យ' },
+    headwayMin: 15, speedKmh: 17, serviceStart: '05:30', serviceEnd: '20:30',
+    stops: ['RUSSEYKEO', 'TOULKORK', 'ITC', 'OLYMPIC', 'TUOLSLENG', 'CHIPMONG271', 'STUNGMEANCHEY'],
+  },
+  {
+    id: 'L08', code: '8A', color: '#4338ca', kind: 'city',
+    name: { en: 'Chroy Changvar – AEON Sen Sok', km: 'ជ្រោយចង្វារ - អ៊ីអន សែនសុខ' },
+    headwayMin: 20, speedKmh: 18, serviceStart: '06:00', serviceEnd: '20:00',
+    stops: ['CHROYCHANGVAR', 'JPBRIDGE', 'CALMETTE', 'TOULKORK', 'AEONSENSOK'],
+  },
+  {
+    id: 'L09', code: '9A', color: '#831843', kind: 'city',
+    name: { en: 'Choam Chao – Chbar Ampov', km: 'ចោមចៅ - ច្បារអំពៅ' },
+    headwayMin: 20, speedKmh: 18, serviceStart: '06:00', serviceEnd: '20:00',
+    stops: ['CHOAMCHAO', 'CHIPMONG271', 'STUNGMEANCHEY', 'AEONMEANCHEY', 'CHBARAMPOV'],
+  },
+  {
+    id: 'L10', code: '10A', color: '#1e3a8a', kind: 'city',
+    name: { en: 'Pochentong – Night Market', km: 'ពោធិ៍ចិនតុង - ផ្សាររាត្រី' },
+    headwayMin: 15, speedKmh: 17, serviceStart: '05:30', serviceEnd: '20:30',
+    stops: ['POCHENTONG', 'RUPP', 'ITC', 'RAILWAY', 'WATPHNOM', 'NIGHTMARKET'],
   },
   {
     id: 'AEB', code: 'AEB', color: '#0e7490', kind: 'airport',
